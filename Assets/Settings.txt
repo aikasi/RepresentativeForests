@@ -1,0 +1,8 @@
+이 아래부터는 화면 관련 설정입니다 (컴마가 없으면 시스템이 줄 전체를 무시합니다)
+ResolutionX, 1920, 가로 해상도를 말합니다
+ResolutionY, 1080, 세로 해상도를 말합니다
+FullScreen, true, 전체화면 여부 (true 또는 false로 입력하세요)
+
+--------- 비디오 설정 ---------
+CrossfadeTime, 1.0, 부드럽게 전환되는 시간(초)
+WatchdogTimeout, 5.0, 영상이 멈췄는지 감시하는 시간 기준

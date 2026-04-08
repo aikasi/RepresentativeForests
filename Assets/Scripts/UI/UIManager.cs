@@ -20,6 +20,12 @@ public class UIManager : MonoBehaviour
     [SerializeField] private GameObject loadingPanel;    // 05: 로딩 화면
     [SerializeField] private GameObject resultPanel;     // 06: 결과 화면
 
+    [Header("===== 동적 배경 연결 (둘 중 하나만 연결) =====")]
+    [Tooltip("결과 패널의 배경으로 사용할 Image 컴포넌트를 연결 (RawImage를 쓴다면 비워둠)")]
+    [SerializeField] private Image resultBackgroundImage;
+    [Tooltip("결과 패널의 배경으로 사용할 RawImage 컴포넌트를 연결 (Image를 쓴다면 비워둠)")]
+    [SerializeField] private RawImage resultBackgroundRawImage;
+
     [Header("===== 공통 버튼 참조 =====")]
     [SerializeField] private Button startButton;         // 대기 화면의 시작 버튼
     [SerializeField] private Button homeButton;          // 결과 화면의 처음으로(홈) 버튼
@@ -45,6 +51,9 @@ public class UIManager : MonoBehaviour
 
     // 임시 로딩 코루틴 참조 (중복 방지 및 인터럽트용)
     private Coroutine _loadingCoroutine;
+
+    // 현재 로드된 결과 이미지 파일명 (해제 추적용)
+    private string _currentResultFileName;
 
     private void Awake()
     {
@@ -96,8 +105,22 @@ public class UIManager : MonoBehaviour
         // 무입력 자동 복귀 감시 (대기 화면에서는 동작 안 함)
         if (!_isInactivityEnabled || _isOnStandby) return;
 
-        // 터치 또는 마우스 클릭 감지 시 타이머 리셋
+        bool hasInput = false;
+
+#if ENABLE_INPUT_SYSTEM
+        // 새로운 Input System 사용 시
+        if (UnityEngine.InputSystem.Mouse.current != null && UnityEngine.InputSystem.Mouse.current.leftButton.wasPressedThisFrame)
+            hasInput = true;
+        if (UnityEngine.InputSystem.Touchscreen.current != null && UnityEngine.InputSystem.Touchscreen.current.touches.Count > 0)
+            hasInput = true;
+#else
+        // 기존 레거시 Input System 사용 시
         if (Input.GetMouseButtonDown(0) || Input.touchCount > 0)
+            hasInput = true;
+#endif
+
+        // 터치 또는 마우스 클릭 감지 시 타이머 리셋
+        if (hasInput)
         {
             _inactivityTimer = 0f;
             return;
@@ -203,6 +226,9 @@ public class UIManager : MonoBehaviour
             _loadingCoroutine = null;
         }
 
+        // 결과 이미지 VRAM 해제
+        UnloadCurrentResultImage();
+
         if (QuizManager.Instance != null)
             QuizManager.Instance.ResetQuiz();
 
@@ -225,6 +251,9 @@ public class UIManager : MonoBehaviour
             StopCoroutine(_loadingCoroutine);
             _loadingCoroutine = null;
         }
+
+        // 결과 이미지 VRAM 해제
+        UnloadCurrentResultImage();
 
         ShowPanel(standbyPanel);
         Debug.Log("[UIManager] 대기 화면으로 복귀 (영상 시퀀스 완료).");
@@ -260,17 +289,66 @@ public class UIManager : MonoBehaviour
 
     /// <summary>
     /// QuizManager에서 퀴즈 완료 이벤트가 도착하면 호출됩니다.
+    /// videoId는 GameManager가 처리, imageId만 사용하여 결과 이미지를 로드합니다.
     /// </summary>
-    private void OnQuizCompleted(string resultId)
+    private void OnQuizCompleted(string videoId, string imageId)
     {
-        // 로딩 화면 표시
-        ShowLoadingPanel();
-        Debug.Log($"[UIManager] 퀴즈 완료! 결과 ID: {resultId} → 로딩 화면 전환.");
+        // 로딩 화면을 띄우지 않고, 제자리에(현재 Q4 화면) 머문 채 터치 입력만 차단합니다.
+        SetTouchLock(true);
+        Debug.Log($"[UIManager] 퀴즈 완료! 영상: {videoId}, 이미지: {imageId} → 전환 대기 및 터치 잠금.");
 
+        // ===== 동적 결과 이미지 온디맨드 로드 (imageId 사용) =====
+        if (ImageManager.Instance != null && resultPanel != null)
+        {
+            // 이전 결과 이미지가 남아있으면 먼저 해제
+            UnloadCurrentResultImage();
+
+            string targetFileName = $"{imageId}-Result.png";
+            Sprite resultSprite = ImageManager.Instance.LoadSprite(targetFileName);
+
+            if (resultSprite != null)
+            {
+                // 인스펙터에 명시적으로 연결된 컴포넌트 우선 적용
+                if (resultBackgroundImage != null)
+                    resultBackgroundImage.sprite = resultSprite;
+                else if (resultBackgroundRawImage != null)
+                    resultBackgroundRawImage.texture = resultSprite.texture;
+                else
+                {
+                    // 연결을 깜빡한 경우를 위한 예비용 자동 탐색
+                    Image imgComp = resultPanel.GetComponentInChildren<Image>();
+                    RawImage rawComp = resultPanel.GetComponentInChildren<RawImage>();
+
+                    if (imgComp != null) imgComp.sprite = resultSprite;
+                    else if (rawComp != null) rawComp.texture = resultSprite.texture;
+                }
+
+                _currentResultFileName = targetFileName;
+                Debug.Log($"[UIManager] 결과 이미지 로드 완료: {targetFileName}");
+            }
+            else
+            {
+                Debug.LogWarning($"[UIManager] 결과 이미지를 찾을 수 없습니다: {targetFileName}");
+            }
+        }
+        
         // VideoManager가 영상 프리로드 완료 후 ShowResultPanel()을 호출합니다.
     }
 
     // VideoManager.CrossfadeCoroutine 내부에서 UIManager.ShowResultPanel()을 직접 호출합니다.
+
+    /// <summary>
+    /// 현재 로드된 결과 이미지를 VRAM에서 해제합니다.
+    /// </summary>
+    private void UnloadCurrentResultImage()
+    {
+        if (!string.IsNullOrEmpty(_currentResultFileName) && ImageManager.Instance != null)
+        {
+            ImageManager.Instance.UnloadSprite(_currentResultFileName);
+            Debug.Log($"[UIManager] 결과 이미지 해제: {_currentResultFileName}");
+            _currentResultFileName = null;
+        }
+    }
 
     // ========== 유틸리티 ==========
 

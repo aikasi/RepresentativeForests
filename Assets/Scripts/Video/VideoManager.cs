@@ -161,17 +161,21 @@ public class VideoManager : MonoBehaviour
         if (MediaScanner.Instance == null)
         {
             ErrorPopup.Show("MediaScanner를 찾을 수 없습니다!");
+            UIManager.Instance?.ReturnToStandby();
             return;
         }
 
         if (!int.TryParse(resultId, out int categoryId))
         {
             Debug.LogError($"[VideoManager] 유효하지 않은 결과 ID: {resultId} (숫자가 아닙니다)");
+            ErrorPopup.Show($"에러: 유효하지 않은 결과 ID ({resultId})");
+            UIManager.Instance?.ReturnToStandby();
             return;
         }
         if (!MediaScanner.Instance.ResultVideos.ContainsKey(categoryId))
         {
             ErrorPopup.Show($"결과 ID {resultId}에 해당하는 영상이 없습니다!");
+            UIManager.Instance?.ReturnToStandby();
             return;
         }
 

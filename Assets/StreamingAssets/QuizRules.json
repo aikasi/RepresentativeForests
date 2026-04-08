@@ -1,30 +1,31 @@
 {
   "totalQuestions": 4,
-  "fallbackResultId": "01",
+  "fallbackVideoId": "01",
+  "fallbackImageId": "01",
   "rules": [
 
-    {"priority": 1,  "ruleName": "정원 - 휴식 (Q3=A이면 무조건)",           "conditions": ["A","A","A","ANY"], "resultId": "01"},
-    {"priority": 2,  "ruleName": "정원 - 풍경 (Q3=C이면 무조건)",           "conditions": ["A","A","C","ANY"], "resultId": "01"},
-    {"priority": 3,  "ruleName": "정원 - 전통예술 (Q3=B, Q4=A)",            "conditions": ["A","A","B","A"],   "resultId": "01"},
-    {"priority": 4,  "ruleName": "정원 - 전통예술 (Q3=B, Q4=C)",            "conditions": ["A","A","B","C"],   "resultId": "01"},
-    {"priority": 5,  "ruleName": "정원 - 이색정원 (나머지 전부: Q3=D 또는 Q3=B+Q4=B,D)", "conditions": ["A","A","ANY","ANY"], "resultId": "04"},
+    {"priority": 1,  "ruleName": "정원 - 휴식 (Q3=A이면 무조건)",           "conditions": ["A","A","A","ANY"], "videoId": "04", "imageId": "12"},
+    {"priority": 2,  "ruleName": "정원 - 풍경 (Q3=C이면 무조건)",           "conditions": ["A","A","C","ANY"], "videoId": "04", "imageId": "13"},
+    {"priority": 3,  "ruleName": "정원 - 전통예술 (Q3=B, Q4=A)",            "conditions": ["A","A","B","A"],   "videoId": "04", "imageId": "14"},
+    {"priority": 4,  "ruleName": "정원 - 전통예술 (Q3=B, Q4=C)",            "conditions": ["A","A","B","C"],   "videoId": "04", "imageId": "14"},
+    {"priority": 5,  "ruleName": "정원 - 이색정원 (나머지 전부: Q3=D 또는 Q3=B+Q4=B,D)", "conditions": ["A","A","ANY","ANY"], "videoId": "04", "imageId": "15"},
 
-    {"priority": 6,  "ruleName": "자연휴양림 - 가족연인 (Q4=B이면 최우선)", "conditions": ["A","B","ANY","B"], "resultId": "02"},
-    {"priority": 7,  "ruleName": "자연휴양림 - 가족연인 (Q3=A이면)",        "conditions": ["A","B","A","ANY"], "resultId": "02"},
-    {"priority": 8,  "ruleName": "자연휴양림 - 휴식관광 (Q3=C, Q4≠B)",      "conditions": ["A","B","C","ANY"], "resultId": "02"},
-    {"priority": 9,  "ruleName": "자연휴양림 - 체험액티비티 (Q3=D, Q4≠B)",  "conditions": ["A","B","D","ANY"], "resultId": "02"},
-    {"priority": 10, "ruleName": "자연휴양림 - 자연탐구 (Q3=B, Q4≠B)",      "conditions": ["A","B","B","ANY"], "resultId": "02"},
+    {"priority": 6,  "ruleName": "자연휴양림 - 가족연인 (Q4=B이면 최우선)", "conditions": ["A","B","ANY","B"], "videoId": "03", "imageId": "11"},
+    {"priority": 7,  "ruleName": "자연휴양림 - 가족연인 (Q3=A이면)",        "conditions": ["A","B","A","ANY"], "videoId": "03", "imageId": "11"},
+    {"priority": 8,  "ruleName": "자연휴양림 - 휴식관광 (Q3=C, Q4≠B)",      "conditions": ["A","B","C","ANY"], "videoId": "03", "imageId": "08"},
+    {"priority": 9,  "ruleName": "자연휴양림 - 체험액티비티 (Q3=D, Q4≠B)",  "conditions": ["A","B","D","ANY"], "videoId": "03", "imageId": "09"},
+    {"priority": 10, "ruleName": "자연휴양림 - 자연탐구 (Q3=B, Q4≠B)",      "conditions": ["A","B","B","ANY"], "videoId": "03", "imageId": "10"},
 
-    {"priority": 11, "ruleName": "명품숲길 - 누구나 편하게 (Q4=D 최우선)",  "conditions": ["B","A","ANY","D"], "resultId": "03"},
-    {"priority": 12, "ruleName": "명품숲길 - 프로숲길러 (Q3=D, Q4=A)",      "conditions": ["B","A","D","A"],   "resultId": "03"},
-    {"priority": 13, "ruleName": "명품숲길 - 프로숲길러 (Q3=B, Q4=A)",      "conditions": ["B","A","B","A"],   "resultId": "03"},
-    {"priority": 14, "ruleName": "명품숲길 - 가볍게 산책하는 (Q3=A)",       "conditions": ["B","A","A","ANY"], "resultId": "03"},
-    {"priority": 15, "ruleName": "명품숲길 - 가볍게 산책하는 (Q3=C)",       "conditions": ["B","A","C","ANY"], "resultId": "03"},
-    {"priority": 16, "ruleName": "명품숲길 - 가벼운 운동이되는 (Q3=D, 나머지 Q4=B,C)", "conditions": ["B","A","D","ANY"], "resultId": "03"},
-    {"priority": 17, "ruleName": "명품숲길 - 가볍게 산책하는 (Dead Zone 안전망: Q3=B+Q4=B,C)", "conditions": ["B","A","ANY","ANY"], "resultId": "10"},
+    {"priority": 11, "ruleName": "명품숲길 - 누구나 편하게 (Q4=D 최우선)",  "conditions": ["B","A","ANY","D"], "videoId": "02", "imageId": "06"},
+    {"priority": 12, "ruleName": "명품숲길 - 프로숲길러 (Q3=D, Q4=A)",      "conditions": ["B","A","D","A"],   "videoId": "02", "imageId": "07"},
+    {"priority": 13, "ruleName": "명품숲길 - 프로숲길러 (Q3=B, Q4=A)",      "conditions": ["B","A","B","A"],   "videoId": "02", "imageId": "07"},
+    {"priority": 14, "ruleName": "명품숲길 - 가볍게 산책하는 (Q3=A)",       "conditions": ["B","A","A","ANY"], "videoId": "02", "imageId": "05"},
+    {"priority": 15, "ruleName": "명품숲길 - 가볍게 산책하는 (Q3=C)",       "conditions": ["B","A","C","ANY"], "videoId": "02", "imageId": "05"},
+    {"priority": 16, "ruleName": "명품숲길 - 가벼운 운동이되는 (Q3=D, 나머지 Q4=B,C)", "conditions": ["B","A","D","ANY"], "videoId": "02", "imageId": "04"},
+    {"priority": 17, "ruleName": "명품숲길 - 가볍게 산책하는 (Dead Zone 안전망: Q3=B+Q4=B,C)", "conditions": ["B","A","ANY","ANY"], "videoId": "02", "imageId": "05"},
 
-    {"priority": 18, "ruleName": "100대 명품숲 - 산림경영형 (Q3=D)",        "conditions": ["B","B","D","ANY"], "resultId": "04"},
-    {"priority": 19, "ruleName": "100대 명품숲 - 산림보전형 (Q3=B)",        "conditions": ["B","B","B","ANY"], "resultId": "04"},
-    {"priority": 20, "ruleName": "100대 명품숲 - 산림휴양형 (Q3=A 또는 C)", "conditions": ["B","B","ANY","ANY"], "resultId": "04"}
+    {"priority": 18, "ruleName": "100대 명품숲 - 산림경영형 (Q3=D)",        "conditions": ["B","B","D","ANY"], "videoId": "01", "imageId": "01"},
+    {"priority": 19, "ruleName": "100대 명품숲 - 산림보전형 (Q3=B)",        "conditions": ["B","B","B","ANY"], "videoId": "01", "imageId": "02"},
+    {"priority": 20, "ruleName": "100대 명품숲 - 산림휴양형 (Q3=A 또는 C)", "conditions": ["B","B","ANY","ANY"], "videoId": "01", "imageId": "03"}
   ]
 }

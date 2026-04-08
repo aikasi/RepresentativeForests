@@ -56,14 +56,15 @@ public class GameManager : MonoBehaviour
 
     /// <summary>
     /// 퀴즈 완료 시 호출되어 영상 시퀀스 재생을 시작합니다.
+    /// videoId로 영상을 재생하고, imageId는 UIManager가 별도로 처리합니다.
     /// </summary>
-    private void OnQuizCompleted(string resultId)
+    private void OnQuizCompleted(string videoId, string imageId)
     {
-        Debug.Log($"[GameManager] 퀴즈 결과 수신: {resultId}번 → 영상 시퀀스 시작 지시.");
+        Debug.Log($"[GameManager] 퀴즈 결과 수신: 영상={videoId}, 이미지={imageId} → 영상 시퀀스 시작 지시.");
 
         if (VideoManager.Instance != null)
         {
-            VideoManager.Instance.StartResultSequence(resultId);
+            VideoManager.Instance.StartResultSequence(videoId);
         }
         else
         {

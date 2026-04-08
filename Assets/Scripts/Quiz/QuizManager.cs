@@ -21,11 +21,14 @@ public class QuizManager : MonoBehaviour
     // 퀴즈가 모두 끝났는지 여부
     public bool IsQuizCompleted { get; private set; } = false;
 
-    // 최종 도출된 결과 ID (예: "01", "02"...)
-    public string ResultId { get; private set; }
+    // 최종 도출된 영상 ID (예: "01", "02"...)
+    public string VideoId { get; private set; }
 
-    // 퀴즈 완료 시 외부(UI, VideoManager 등)에 알리기 위한 이벤트
-    public event Action<string> OnQuizCompleted;
+    // 최종 도출된 이미지 ID (예: "01", "02"...)
+    public string ImageId { get; private set; }
+
+    // 퀴즈 완료 시 외부(UI, VideoManager 등)에 알리기 위한 이벤트 (videoId, imageId)
+    public event Action<string, string> OnQuizCompleted;
 
     // 사용자 응답 저장 배열
     private string[] _userAnswers;
@@ -33,8 +36,9 @@ public class QuizManager : MonoBehaviour
     // JSON에서 로드된 규칙 리스트
     private List<QuizRule> _rules = new List<QuizRule>();
 
-    // 매칭 실패 시 사용할 안전망 결과 ID
-    private string _fallbackResultId = "01";
+    // 매칭 실패 시 사용할 안전망 ID
+    private string _fallbackVideoId = "01";
+    private string _fallbackImageId = "01";
 
     private void Awake()
     {
@@ -71,7 +75,8 @@ public class QuizManager : MonoBehaviour
             QuizRuleSet ruleSet = JsonUtility.FromJson<QuizRuleSet>(jsonText);
 
             TotalQuestions = ruleSet.totalQuestions;
-            _fallbackResultId = ruleSet.fallbackResultId;
+            _fallbackVideoId = ruleSet.fallbackVideoId;
+            _fallbackImageId = ruleSet.fallbackImageId;
             _userAnswers = new string[TotalQuestions];
 
             // 규칙을 우선순위(priority) 기준 오름차순으로 정렬 (1순위가 먼저 검사됨)
@@ -134,19 +139,21 @@ public class QuizManager : MonoBehaviour
         {
             if (IsRuleMatched(rule))
             {
-                ResultId = rule.resultId;
+                VideoId = rule.videoId;
+                ImageId = rule.imageId;
                 IsQuizCompleted = true;
-                Debug.Log($"[QuizManager] 퀴즈 결과: {rule.resultId}번 카테고리 매칭! (규칙: {rule.ruleName})");
-                OnQuizCompleted?.Invoke(ResultId);
+                Debug.Log($"[QuizManager] 퀴즈 결과 매칭! 영상: {rule.videoId}, 이미지: {rule.imageId} (규칙: {rule.ruleName})");
+                OnQuizCompleted?.Invoke(VideoId, ImageId);
                 return;
             }
         }
 
         // 어떤 규칙에도 매칭되지 않은 경우 안전망(Fallback) 적용
-        ResultId = _fallbackResultId;
+        VideoId = _fallbackVideoId;
+        ImageId = _fallbackImageId;
         IsQuizCompleted = true;
-        Debug.LogWarning($"[QuizManager] 매칭되는 규칙이 없어 Fallback 결과 적용: {_fallbackResultId}번");
-        OnQuizCompleted?.Invoke(ResultId);
+        Debug.LogWarning($"[QuizManager] 매칭되는 규칙이 없어 Fallback 적용: 영상={_fallbackVideoId}, 이미지={_fallbackImageId}");
+        OnQuizCompleted?.Invoke(VideoId, ImageId);
     }
 
     /// <summary>
@@ -187,7 +194,8 @@ public class QuizManager : MonoBehaviour
     {
         CurrentQuestionIndex = 0;
         IsQuizCompleted = false;
-        ResultId = null;
+        VideoId = null;
+        ImageId = null;
         _userAnswers = new string[TotalQuestions];
         Debug.Log("[QuizManager] 퀴즈 상태가 초기화되었습니다.");
     }
@@ -198,7 +206,8 @@ public class QuizManager : MonoBehaviour
     private class QuizRuleSet
     {
         public int totalQuestions;
-        public string fallbackResultId;
+        public string fallbackVideoId;
+        public string fallbackImageId;
         public List<QuizRule> rules;
     }
 
@@ -208,6 +217,7 @@ public class QuizManager : MonoBehaviour
         public int priority;
         public string ruleName;
         public string[] conditions;
-        public string resultId;
+        public string videoId;
+        public string imageId;
     }
 }

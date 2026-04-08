@@ -328,7 +328,8 @@ public class UIManager : MonoBehaviour
             }
             else
             {
-                Debug.LogWarning($"[UIManager] 결과 이미지를 찾을 수 없습니다: {targetFileName}");
+                Debug.LogError($"[UIManager] 결과 이미지를 찾을 수 없습니다: {targetFileName}");
+                if (ErrorPopup.Instance != null) ErrorPopup.Show($"에러: 이미지를 찾을 수 없습니다.\n({targetFileName})");
             }
         }
         

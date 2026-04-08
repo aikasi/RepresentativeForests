@@ -64,6 +64,7 @@ public class QuizManager : MonoBehaviour
         if (!File.Exists(path))
         {
             Debug.LogError("[QuizManager] QuizRules.json 파일을 찾을 수 없습니다! 기본값으로 동작합니다.");
+            if (ErrorPopup.Instance != null) ErrorPopup.Show("에러: QuizRules.json 파일이 없습니다.");
             TotalQuestions = 4;
             _userAnswers = new string[TotalQuestions];
             return;
@@ -88,6 +89,7 @@ public class QuizManager : MonoBehaviour
         catch (Exception e)
         {
             Debug.LogError($"[QuizManager] JSON 파싱 중 치명적 에러 발생: {e.Message}");
+            if (ErrorPopup.Instance != null) ErrorPopup.Show($"에러: JSON 문법 오류\n{e.Message}");
             TotalQuestions = 4;
             _userAnswers = new string[TotalQuestions];
         }

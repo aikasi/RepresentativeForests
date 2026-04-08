@@ -201,5 +201,11 @@ public class MediaScanner : MonoBehaviour
         HasCriticalError = true;
         ErrorMessages.Add(message);
         Debug.LogError($"[MediaScanner] 치명적 에러: {message}");
+        
+        // ErrorPopup에 즉시 전달 (큐를 통해 순서대로 모두 표시됨)
+        if (ErrorPopup.Instance != null)
+        {
+            ErrorPopup.Show($"스캔 에러:\n{message}");
+        }
     }
 }

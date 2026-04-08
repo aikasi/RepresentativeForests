@@ -147,10 +147,23 @@ public class VideoManager : MonoBehaviour
             return;
         }
 
-        Debug.Log("[VideoManager] 대기 영상 재생 시작.");
+        Debug.Log("[VideoManager] 대기 영상 재생 시작. (백그라운드 프리로드는 안정화 후 진행)");
 
-        // ★ 즉시 백그라운드에 같은 대기 영상을 미리 로딩 (셀프 크로스페이드 대비)
-        PreloadNextVideoImmediately(MediaScanner.Instance.IdleVideoPath);
+        // ★ 즉시 로딩하지 않고, PlayerA가 완전히 화면에 뜨고 안정화되면 프리로드 시작
+        StartCoroutine(DelayedPreloadIdleVideo(MediaScanner.Instance.IdleVideoPath));
+    }
+
+    /// <summary>
+    /// 빌드 초기 시작 시 동시에 2개의 미디어가 디스크 IO를 일으키는 병목을 방지합니다.
+    /// </summary>
+    private IEnumerator DelayedPreloadIdleVideo(string videoPath)
+    {
+        yield return new WaitForSeconds(2.0f);
+
+        if (!_isSequencePlaying && !_isCrossfading)
+        {
+            PreloadNextVideoImmediately(videoPath);
+        }
     }
 
     /// <summary>

@@ -17,14 +17,16 @@ public class ErrorPopup : MonoBehaviour
     [SerializeField] private GameObject popupPanel;           // 팝업 패널 루트
     [SerializeField] private TextMeshProUGUI messageText;     // 에러 메시지 텍스트
     [SerializeField] private CanvasGroup popupCanvasGroup;    // 페이드 인/아웃용
+    [Tooltip("에러 팝업을 수동으로 닫을 닫기 버튼")]
+    [SerializeField] private Button closeButton;              
 
     [Header("===== 팝업 설정 =====")]
-    [SerializeField] private float displayDuration = 5.0f;    // 표시 시간 (초)
     [SerializeField] private float fadeTime = 0.3f;           // 페이드 애니메이션 시간
 
     // 에러 메시지 큐 (동시 다발 에러 대응)
     private Queue<string> _messageQueue = new Queue<string>();
     private bool _isShowing = false;
+    private bool _isCloseRequested = false;
     private Coroutine _popupCoroutine;
 
     private void Awake()
@@ -40,8 +42,11 @@ public class ErrorPopup : MonoBehaviour
 
     private void Start()
     {
-        // CSVReader에서 표시 시간 로드 (선택)
-        displayDuration = CSVReader.GetFloatValue("ErrorPopupDuration", 5.0f);
+        // 닫기 버튼 이벤트 연결
+        if (closeButton != null)
+        {
+            closeButton.onClick.AddListener(OnCloseButtonClicked);
+        }
 
         // 초기 상태: 팝업 숨김
         if (popupPanel != null)
@@ -136,8 +141,9 @@ public class ErrorPopup : MonoBehaviour
         // 페이드 인
         yield return StartCoroutine(FadeCoroutine(0f, 1f));
 
-        // 표시 시간 대기
-        yield return new WaitForSeconds(displayDuration);
+        // 사용자가 닫기 버튼을 누를 때까지 무한 대기
+        _isCloseRequested = false;
+        yield return new WaitUntil(() => _isCloseRequested);
 
         // 페이드 아웃
         yield return StartCoroutine(FadeCoroutine(1f, 0f));
@@ -150,6 +156,17 @@ public class ErrorPopup : MonoBehaviour
 
         // 큐에 남은 메시지가 있으면 다음 표시
         ShowNextMessage();
+    }
+
+    /// <summary>
+    /// 닫기 버튼을 클릭했을 때 호출됩니다.
+    /// </summary>
+    private void OnCloseButtonClicked()
+    {
+        if (_isShowing)
+        {
+            _isCloseRequested = true;
+        }
     }
 
     /// <summary>

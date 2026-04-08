@@ -36,6 +36,7 @@ public class VideoManager : MonoBehaviour
 
     // 크로스페이드 시간 (CSVReader에서 로드)
     private float _crossfadeTime = 1.0f;
+    private float _preloadDelayTime = 2.0f;
 
     // 현재 재생 중인 시퀀스 리스트 및 인덱스
     private List<string> _currentSequence;
@@ -72,6 +73,7 @@ public class VideoManager : MonoBehaviour
     private void Start()
     {
         _crossfadeTime = CSVReader.GetFloatValue("CrossfadeTime", 1.0f);
+        _preloadDelayTime = CSVReader.GetFloatValue("PreloadDelayTime", 2.0f);
 
         // 초기 상태: Player A가 활성, Player B가 백그라운드
         _activePlayer = playerA;
@@ -158,7 +160,7 @@ public class VideoManager : MonoBehaviour
     /// </summary>
     private IEnumerator DelayedPreloadIdleVideo(string videoPath)
     {
-        yield return new WaitForSeconds(2.0f);
+        yield return new WaitForSeconds(_preloadDelayTime);
 
         if (!_isSequencePlaying && !_isCrossfading)
         {
@@ -192,18 +194,17 @@ public class VideoManager : MonoBehaviour
             return;
         }
 
-        // 셀프 크로스페이드 또는 크로스페이드 진행 중이면 인터럽트
+        // ★ 기존 상태를 완전히 정리 (크로스페이드 중이든, 프리로드 중이든 관계없이)
         if (_isIdleSelfCrossfading || _isCrossfading)
         {
             InterruptSelfCrossfade();
         }
-        else
-        {
-            // 사전 로딩 중이었으면 중단하고 백그라운드 해제
-            StopAllVideoCoroutines();
-            _backgroundPlayer.CloseMedia();
-            _isPreloadReady = false;
-        }
+
+        // ★ 반드시 기존 코루틴 중지 + 백그라운드 해제 + 프리로드 플래그 무효화
+        // (InterruptSelfCrossfade 후에도 추가 실행하여 잔여 상태까지 모두 정리)
+        StopAllVideoCoroutines();
+        _backgroundPlayer.CloseMedia();
+        _isPreloadReady = false;
 
         _currentSequence = MediaScanner.Instance.ResultVideos[categoryId];
         _currentSequenceIndex = 0;
@@ -375,6 +376,9 @@ public class VideoManager : MonoBehaviour
     /// </summary>
     private void PreloadAndCrossfade(string videoPath, bool isIdleVideo = false)
     {
+        // ★ 기존에 백그라운드 프리로드를 시도 중이던 코루틴이 있다면 확실히 파괴하여 동시 점유 방지
+        StopAllVideoCoroutines();
+        
         _preloadCoroutine = StartCoroutine(PreloadAndCrossfadeCoroutine(videoPath, isIdleVideo));
     }
 
@@ -382,7 +386,10 @@ public class VideoManager : MonoBehaviour
     {
         _isIdleSelfCrossfading = isIdleVideo;
 
-        // ★ 사전 로딩이 이미 완료된 경우 → 로딩 0초! 즉시 크로스페이드!
+        // ★ 진입 즉시 크로스페이드 플래그 설정 (Fallback 로딩 중 OnCurrentVideoFinished 오작동 방지)
+        _isCrossfading = true;
+
+        // 사전 로딩이 이미 완료된 경우 → 로딩 0초! 즉시 크로스페이드!
         if (_isPreloadReady)
         {
             Debug.Log("[VideoManager] 사전 로딩 완료 상태! 즉시 크로스페이드.");

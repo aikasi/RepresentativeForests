@@ -48,10 +48,31 @@ public class GameManager : MonoBehaviour
         int resX = CSVReader.GetIntValue("ResolutionX", 1920);
         int resY = CSVReader.GetIntValue("ResolutionY", 1080);
         bool isFullScreen = CSVReader.GetStringValue("FullScreen", "true").ToLower() == "true";
+        bool hideCursor = CSVReader.GetStringValue("HideCursor", "false").ToLower() == "true";
+        
+        // 서브 모니터 설정 추가
+        bool useSubMonitor = CSVReader.GetStringValue("UseSubMonitor", "false").ToLower() == "true";
+        int subResX = CSVReader.GetIntValue("SubResolutionX", 1920);
+        int subResY = CSVReader.GetIntValue("SubResolutionY", 1080);
 
+        // 메인 모니터 적용
         Screen.SetResolution(resX, resY, isFullScreen);
 
-        Debug.Log($"[GameManager] 키오스크 해상도 적용 완료: {resX}x{resY} (전체화면: {isFullScreen})");
+        // 서브 모니터 활성화 (연결된 모니터가 2개 이상일 때만)
+        if (useSubMonitor && Display.displays.Length > 1)
+        {
+            Display.displays[1].Activate(subResX, subResY, 60); // 기본 주사율 60Hz로 고정
+            Debug.Log($"[GameManager] 서브 모니터 활성화 완료: {subResX}x{subResY}");
+        }
+        else if (useSubMonitor && Display.displays.Length <= 1)
+        {
+            Debug.LogWarning("[GameManager] 서브 모니터 설정을 켰으나 물리적으로 2번째 모니터가 연결되어 있지 않습니다!");
+        }
+
+        // 커서 숨김 옵션 적용
+        Cursor.visible = !hideCursor;
+
+        Debug.Log($"[GameManager] 키오스크 해상도 적용 완료: 메인 {resX}x{resY} (전체화면: {isFullScreen}, 커서숨김: {hideCursor})");
     }
 
     /// <summary>

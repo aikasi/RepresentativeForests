@@ -156,6 +156,10 @@ public class VideoWatchdog : MonoBehaviour
             autoPlay: true
         );
 
+        // ★ 볼륨 복원 (크로스페이드 중 프리징 시 볼륨이 중간값일 수 있음)
+        if (_targetPlayer.Control != null)
+            _targetPlayer.Control.SetVolume(1f);
+
         // 재시도 카운터 리셋
         _retryCount = 0;
         _lastTime = 0;

@@ -51,6 +51,7 @@ public class VideoManager : MonoBehaviour
     // 코루틴 참조 (인터럽트용)
     private Coroutine _crossfadeCoroutine;
     private Coroutine _preloadCoroutine;
+    private Coroutine _delayedPreloadCoroutine;
 
     // 영상 시퀀스 완료 시 외부 알림 이벤트
     public event Action OnSequenceCompleted;
@@ -152,7 +153,7 @@ public class VideoManager : MonoBehaviour
         Debug.Log("[VideoManager] 대기 영상 재생 시작. (백그라운드 프리로드는 안정화 후 진행)");
 
         // ★ 즉시 로딩하지 않고, PlayerA가 완전히 화면에 뜨고 안정화되면 프리로드 시작
-        StartCoroutine(DelayedPreloadIdleVideo(MediaScanner.Instance.IdleVideoPath));
+        _delayedPreloadCoroutine = StartCoroutine(DelayedPreloadIdleVideo(MediaScanner.Instance.IdleVideoPath));
     }
 
     /// <summary>
@@ -237,7 +238,7 @@ public class VideoManager : MonoBehaviour
         _backgroundPlayer.CloseMedia();
 
         // ★ 볼륨 복원 안전장치: 활성 플레이어 볼륨 1로 보장
-        _activePlayer.Control.SetVolume(1f);
+        _activePlayer.Control?.SetVolume(1f);
 
         PreloadAndCrossfade(MediaScanner.Instance.IdleVideoPath, false);
     }
@@ -366,7 +367,7 @@ public class VideoManager : MonoBehaviour
         }
 
         // ★ 볼륨 복원 안전장치: 활성 플레이어 볼륨 1로 보장
-        _activePlayer.Control.SetVolume(1f);
+        _activePlayer.Control?.SetVolume(1f);
 
         Debug.Log("[VideoManager] 플레이어 상태 안정화 완료.");
     }
@@ -377,6 +378,7 @@ public class VideoManager : MonoBehaviour
     {
         if (_crossfadeCoroutine != null) { StopCoroutine(_crossfadeCoroutine); _crossfadeCoroutine = null; }
         if (_preloadCoroutine != null) { StopCoroutine(_preloadCoroutine); _preloadCoroutine = null; }
+        if (_delayedPreloadCoroutine != null) { StopCoroutine(_delayedPreloadCoroutine); _delayedPreloadCoroutine = null; }
     }
 
     /// <summary>
@@ -420,6 +422,8 @@ public class VideoManager : MonoBehaviour
         if (!opened)
         {
             Debug.LogError($"[VideoManager] 영상 열기 실패: {System.IO.Path.GetFileName(videoPath)}");
+            _isCrossfading = false;
+            _isIdleSelfCrossfading = false;
             yield break;
         }
 
@@ -436,6 +440,8 @@ public class VideoManager : MonoBehaviour
         if (elapsed >= timeout)
         {
             Debug.LogError($"[VideoManager] 프리로드 타임아웃: {System.IO.Path.GetFileName(videoPath)}");
+            _isCrossfading = false;
+            _isIdleSelfCrossfading = false;
             yield break;
         }
 

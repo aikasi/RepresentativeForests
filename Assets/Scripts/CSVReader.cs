@@ -1,4 +1,4 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using System.IO;
 using System.Text;
 using UnityEngine;
@@ -43,8 +43,9 @@ public class CSVReader : MonoBehaviour
             var raw = File.ReadAllBytes(path);
             return Encoding.UTF8.GetString(raw);
         }
-        catch (System.Exception)
+        catch (System.Exception e)
         {
+            Debug.LogError($"[CSVReader] 설정 파일 읽기 실패: {e.Message}");
             return string.Empty;
         }
     }

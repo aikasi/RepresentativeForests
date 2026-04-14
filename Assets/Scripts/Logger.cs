@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Collections.Concurrent;
 using System.IO;
 using System.Linq;
 using System.Text;
@@ -25,7 +26,8 @@ public class Logger : MonoBehaviour
     private bool appendTime = true;
 
     private StreamWriter writer;
-    private readonly Queue<string> logQueue = new();
+    // 스레드 안전 큐 (logMessageReceivedThreaded가 백그라운드 스레드에서 호출되므로 필수)
+    private readonly ConcurrentQueue<string> logQueue = new();
     private Task writeTask;
     private bool finishing = false;
 
@@ -96,12 +98,12 @@ public class Logger : MonoBehaviour
 
         if (writeTask != null && !writeTask.IsCompleted) return;
 
-        if (logQueue.Count == 0) return;
+        if (logQueue.IsEmpty) return;
 
-        // drain queue
+        // 큐에서 안전하게 꺼내기 (스레드 안전)
         var sb = new StringBuilder();
-        while (logQueue.Count > 0)
-            sb.AppendLine(logQueue.Dequeue());
+        while (logQueue.TryDequeue(out string entry))
+            sb.AppendLine(entry);
         writeTask = WriteAndFlushAsync(sb.ToString());
         async Task WriteAndFlushAsync(string text)
         {
@@ -117,11 +119,11 @@ public class Logger : MonoBehaviour
         writeTask?.Wait();
         writeTask = null;
 
-        if (logQueue.Count > 0)
+        if (!logQueue.IsEmpty)
         {
             var sb = new StringBuilder();
-            while (logQueue.Count > 0)
-                sb.AppendLine(logQueue.Dequeue());
+            while (logQueue.TryDequeue(out string entry))
+                sb.AppendLine(entry);
             writer.Write(sb.ToString());
         }
         writer.Flush();

@@ -73,3 +73,6 @@ crashlytics-build.properties
 .Trashes
 ehthumbs.db
 Thumbs.db
+
+# 대용량 압축 파일 제외 (GitHub 100MB 제한)
+*.7z

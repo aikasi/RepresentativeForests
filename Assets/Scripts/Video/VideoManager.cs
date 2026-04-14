@@ -236,6 +236,9 @@ public class VideoManager : MonoBehaviour
 
         _backgroundPlayer.CloseMedia();
 
+        // ★ 볼륨 복원 안전장치: 활성 플레이어 볼륨 1로 보장
+        _activePlayer.Control.SetVolume(1f);
+
         PreloadAndCrossfade(MediaScanner.Instance.IdleVideoPath, false);
     }
 
@@ -307,6 +310,9 @@ public class VideoManager : MonoBehaviour
             yield break;
         }
 
+        // ★ 프리로딩 중 소리 겹침 방지: 볼륨 0으로 뮤트
+        _backgroundPlayer.Control.SetVolume(0f);
+
         // 재생 시작 (첫 프레임 생성을 위해)
         _backgroundPlayer.Control.Play();
 
@@ -358,6 +364,9 @@ public class VideoManager : MonoBehaviour
             _backgroundCanvasGroup.alpha = 0f;
             _backgroundPlayer.CloseMedia();
         }
+
+        // ★ 볼륨 복원 안전장치: 활성 플레이어 볼륨 1로 보장
+        _activePlayer.Control.SetVolume(1f);
 
         Debug.Log("[VideoManager] 플레이어 상태 안정화 완료.");
     }
@@ -430,6 +439,8 @@ public class VideoManager : MonoBehaviour
             yield break;
         }
 
+        // ★ Fallback 프리로딩 중 소리 겹침 방지: 볼륨 0으로 뮤트
+        _backgroundPlayer.Control.SetVolume(0f);
         _backgroundPlayer.Control.Play();
 
         // 첫 프레임 렌더링 대기 (검은 화면 차단)
@@ -470,6 +481,10 @@ public class VideoManager : MonoBehaviour
             UIManager.Instance.ShowResultPanel();
         }
 
+        // ★ 크로스페이드 시작: 오디오도 함께 페이드 (소리 겹침 방지)
+        _activePlayer.Control.SetVolume(1f);
+        _backgroundPlayer.Control.SetVolume(0f);
+
         float elapsed = 0f;
 
         while (elapsed < _crossfadeTime)
@@ -477,14 +492,23 @@ public class VideoManager : MonoBehaviour
             elapsed += Time.deltaTime;
             float t = Mathf.Clamp01(elapsed / _crossfadeTime);
 
+            // 비주얼 크로스페이드
             _activeCanvasGroup.alpha = 1f - t;
             _backgroundCanvasGroup.alpha = t;
+
+            // 오디오 크로스페이드
+            _activePlayer.Control.SetVolume(1f - t);
+            _backgroundPlayer.Control.SetVolume(t);
 
             yield return null;
         }
 
         _activeCanvasGroup.alpha = 0f;
         _backgroundCanvasGroup.alpha = 1f;
+
+        // ★ 오디오 최종 상태 보장
+        _activePlayer.Control.SetVolume(0f);
+        _backgroundPlayer.Control.SetVolume(1f);
 
         // 이전 활성 플레이어 VRAM 해제
         _activePlayer.CloseMedia();

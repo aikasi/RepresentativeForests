@@ -20,6 +20,11 @@ public class GameManager : MonoBehaviour
         Instance = this;
         DontDestroyOnLoad(gameObject);
 
+        // 모니터 주기율과 상관없이 처리되도록 VSync 끄기
+        QualitySettings.vSyncCount = 0; 
+        // 60프레임으로 게임 속도 고정 (발열 및 GPU 점유율 최적화)
+        Application.targetFrameRate = 60; 
+
         // 프로그램 진입 시 해상도 세팅 강제 적용
         ApplyStartupSettings();
     }

@@ -78,7 +78,7 @@ RepresentativeForests/
 
 ---
 
-## 4. 파일명 규칙 
+## 4. 파일명 규칙
 
 > ⚠️ **중요**: 파일명 규칙을 반드시 준수해야 합니다. 규칙에 맞지 않는 파일은 시스템이 무시하거나 에러를 발생시킵니다.
 
@@ -427,7 +427,7 @@ WatchdogTimeout, 5.0, 영상이 멈췄는지 감시하는 시간 기준
 
 ### 로그 파일 위치
 
-- **Windows**: `C:\Users\{사용자명}\AppData\LocalLow\{회사명}\RepresentativeForests\Logs\`
+- **Windows**: `C:\Users\{사용자명}\AppData\LocalLow\Metadevs\RepresentativeForests\Logs\`
 - 파일명 형식: `YYMMDD-HHmmss.log`
 - 오래된 로그는 최대 1000개까지 유지 후 자동 삭제됩니다.
 

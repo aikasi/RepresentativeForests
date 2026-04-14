@@ -151,7 +151,8 @@ public class UIManager : MonoBehaviour
     {
         if (touchCanvasGroup != null)
         {
-            touchCanvasGroup.interactable = !locked;
+            // interactable을 끄면 모든 버튼이 회색(Disabled)으로 변해 잔여화면처럼 보이므로 주석 처리 (원래 색깔 유지)
+            // touchCanvasGroup.interactable = !locked; 
             touchCanvasGroup.blocksRaycasts = !locked;
         }
     }

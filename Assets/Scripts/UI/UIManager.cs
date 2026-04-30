@@ -49,6 +49,9 @@ public class UIManager : MonoBehaviour
     // 퀴즈 패널 배열 (Q1~Q4 순서)
     private GameObject[] _quizPanels;
 
+    // 패널별 CanvasGroup 참조 (SetActive 대신 alpha로 제어 → Canvas Rebuild 방지)
+    private CanvasGroup[] _panelCanvasGroups;
+
     // 임시 로딩 코루틴 참조 (중복 방지 및 인터럽트용)
     private Coroutine _loadingCoroutine;
 
@@ -77,6 +80,27 @@ public class UIManager : MonoBehaviour
         // 퀴즈 패널 배열 (순서 중요: 인덱스 0=Q1, 1=Q2, 2=Q3, 3=Q4)
         _quizPanels = new GameObject[] { q1Panel, q2Panel, q3Panel, q4Panel };
 
+        // CanvasGroup 초기화: 없으면 자동 추가 (Canvas Rebuild 방지를 위한 필수 구성)
+        // SetActive 대신 CanvasGroup.alpha로 패널 가시성을 제어하여
+        // 패널 전환 시 Canvas Layout/Mesh Rebuild가 발생하지 않습니다.
+        _panelCanvasGroups = new CanvasGroup[_allPanels.Length];
+        for (int i = 0; i < _allPanels.Length; i++)
+        {
+            if (_allPanels[i] == null) continue;
+
+            CanvasGroup cg = _allPanels[i].GetComponent<CanvasGroup>();
+            if (cg == null)
+            {
+                cg = _allPanels[i].AddComponent<CanvasGroup>();
+                Debug.LogWarning($"[UIManager] '{_allPanels[i].name}'에 CanvasGroup이 없어 자동 추가했습니다.");
+            }
+            _panelCanvasGroups[i] = cg;
+
+            // 모든 패널을 활성 상태로 유지 (이후 CanvasGroup으로만 가시성 제어)
+            // SetActive는 여기서 한 번만 호출하고, 이후 절대 변경하지 않음
+            _allPanels[i].SetActive(true);
+        }
+
         // 버튼 이벤트 바인딩
         if (startButton != null)
             startButton.onClick.AddListener(OnStartButtonClicked);
@@ -93,7 +117,7 @@ public class UIManager : MonoBehaviour
         _isInactivityEnabled = (_inactivityTimeout > 0f);
         _inactivityTimer = 0f;
 
-        // 초기 상태: 대기 화면만 활성화
+        // 초기 상태: 대기 화면만 표시 (CanvasGroup으로 제어, SetActive 미사용)
         ShowPanel(standbyPanel);
         _isOnStandby = true;
 
@@ -290,7 +314,8 @@ public class UIManager : MonoBehaviour
 
     /// <summary>
     /// QuizManager에서 퀴즈 완료 이벤트가 도착하면 호출됩니다.
-    /// videoId는 GameManager가 처리, imageId만 사용하여 결과 이미지를 로드합니다.
+    /// videoId는 GameManager가 처리, imageId만 사용하여 결과 이미지를 비동기로 로드합니다.
+    /// 비동기 로딩으로 대기영상 끊김을 방지합니다.
     /// </summary>
     private void OnQuizCompleted(string videoId, string imageId)
     {
@@ -298,40 +323,43 @@ public class UIManager : MonoBehaviour
         SetTouchLock(true);
         Debug.Log($"[UIManager] 퀴즈 완료! 영상: {videoId}, 이미지: {imageId} → 전환 대기 및 터치 잠금.");
 
-        // ===== 동적 결과 이미지 온디맨드 로드 (imageId 사용) =====
+        // ===== 동적 결과 이미지 온디맨드 비동기 로드 (imageId 사용) =====
         if (ImageManager.Instance != null && resultPanel != null)
         {
             // 이전 결과 이미지가 남아있으면 먼저 해제
             UnloadCurrentResultImage();
 
             string targetFileName = $"{imageId}-Result.png";
-            Sprite resultSprite = ImageManager.Instance.LoadSprite(targetFileName);
 
-            if (resultSprite != null)
+            // 비동기 로딩 시작 (메인 스레드 블로킹 방지 → 대기영상 끊김 해결)
+            ImageManager.Instance.LoadSpriteAsync(targetFileName, (resultSprite) =>
             {
-                // 인스펙터에 명시적으로 연결된 컴포넌트 우선 적용
-                if (resultBackgroundImage != null)
-                    resultBackgroundImage.sprite = resultSprite;
-                else if (resultBackgroundRawImage != null)
-                    resultBackgroundRawImage.texture = resultSprite.texture;
+                if (resultSprite != null)
+                {
+                    // 인스펙터에 명시적으로 연결된 컴포넌트 우선 적용
+                    if (resultBackgroundImage != null)
+                        resultBackgroundImage.sprite = resultSprite;
+                    else if (resultBackgroundRawImage != null)
+                        resultBackgroundRawImage.texture = resultSprite.texture;
+                    else
+                    {
+                        // 연결을 깜빡한 경우를 위한 예비용 자동 탐색
+                        Image imgComp = resultPanel.GetComponentInChildren<Image>();
+                        RawImage rawComp = resultPanel.GetComponentInChildren<RawImage>();
+
+                        if (imgComp != null) imgComp.sprite = resultSprite;
+                        else if (rawComp != null) rawComp.texture = resultSprite.texture;
+                    }
+
+                    _currentResultFileName = targetFileName;
+                    Debug.Log($"[UIManager] 결과 이미지 비동기 로드 완료: {targetFileName}");
+                }
                 else
                 {
-                    // 연결을 깜빡한 경우를 위한 예비용 자동 탐색
-                    Image imgComp = resultPanel.GetComponentInChildren<Image>();
-                    RawImage rawComp = resultPanel.GetComponentInChildren<RawImage>();
-
-                    if (imgComp != null) imgComp.sprite = resultSprite;
-                    else if (rawComp != null) rawComp.texture = resultSprite.texture;
+                    Debug.LogError($"[UIManager] 결과 이미지를 찾을 수 없습니다: {targetFileName}");
+                    if (ErrorPopup.Instance != null) ErrorPopup.Show($"에러: 이미지를 찾을 수 없습니다.\n({targetFileName})");
                 }
-
-                _currentResultFileName = targetFileName;
-                Debug.Log($"[UIManager] 결과 이미지 로드 완료: {targetFileName}");
-            }
-            else
-            {
-                Debug.LogError($"[UIManager] 결과 이미지를 찾을 수 없습니다: {targetFileName}");
-                if (ErrorPopup.Instance != null) ErrorPopup.Show($"에러: 이미지를 찾을 수 없습니다.\n({targetFileName})");
-            }
+            });
         }
         
         // VideoManager가 영상 프리로드 완료 후 ShowResultPanel()을 호출합니다.
@@ -355,19 +383,26 @@ public class UIManager : MonoBehaviour
     // ========== 유틸리티 ==========
 
     /// <summary>
-    /// 지정된 패널만 활성화하고 나머지는 전부 비활성화합니다.
-    /// 널(Null) 체크를 포함하여 Inspector 미연결 시에도 다운을 방지합니다.
+    /// 지정된 패널만 보이게 하고 나머지는 전부 숨깁니다.
+    /// SetActive 대신 CanvasGroup을 사용하여 Canvas Rebuild를 방지합니다.
+    /// 이로 인해 패널 전환 시 메인 스레드 블로킹이 발생하지 않아 영상 끊김이 없습니다.
     /// </summary>
     private void ShowPanel(GameObject targetPanel)
     {
-        foreach (GameObject panel in _allPanels)
+        for (int i = 0; i < _allPanels.Length; i++)
         {
-            if (panel == null)
+            if (_allPanels[i] == null || _panelCanvasGroups[i] == null)
             {
                 Debug.LogWarning("[UIManager] Inspector에 연결되지 않은 패널이 있습니다! 확인해 주세요.");
                 continue;
             }
-            panel.SetActive(panel == targetPanel);
+
+            bool isTarget = (_allPanels[i] == targetPanel);
+
+            // CanvasGroup으로 가시성 제어 (SetActive 미사용 → Canvas Rebuild 없음)
+            _panelCanvasGroups[i].alpha = isTarget ? 1f : 0f;
+            _panelCanvasGroups[i].blocksRaycasts = isTarget;
+            _panelCanvasGroups[i].interactable = isTarget;
         }
 
         // 대기 화면 여부 업데이트 (무입력 타이머 제어용)

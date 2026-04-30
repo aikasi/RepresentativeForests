@@ -213,8 +213,19 @@ public class ImageManager : MonoBehaviour
         });
 
         // 백그라운드 스레드 완료 대기 (메인 스레드는 블로킹하지 않음)
+        // ★ 타임아웃 추가: Task.Run이 완료되지 않으면 코루틴 무한 대기 방지
+        float ioTimeout = 10f;
+        float ioElapsed = 0f;
         while (!ioCompleted)
         {
+            ioElapsed += Time.deltaTime;
+            if (ioElapsed >= ioTimeout)
+            {
+                Debug.LogError($"[ImageManager] 디스크 I/O 타임아웃 ({ioTimeout}초 초과): {fileName}");
+                _loadingInProgress.Remove(fileName);
+                onComplete?.Invoke(null);
+                yield break;
+            }
             yield return null;
         }
 

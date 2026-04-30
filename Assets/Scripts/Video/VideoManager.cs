@@ -404,7 +404,21 @@ public class VideoManager : MonoBehaviour
         if (_isPreloadReady)
         {
             Debug.Log("[VideoManager] 사전 로딩 완료 상태! 즉시 크로스페이드.");
-            _backgroundPlayer.Control.Play();
+
+            // ★ Control null 안전 접근 (ForceReload 등 외부 간섭 방어)
+            if (_backgroundPlayer.Control != null)
+            {
+                _backgroundPlayer.Control.Play();
+            }
+            else
+            {
+                Debug.LogError("[VideoManager] 프리로드 실패: 백그라운드 플레이어의 Control이 null입니다.");
+                _isCrossfading = false;
+                _isIdleSelfCrossfading = false;
+                _preloadCoroutine = null;
+                yield break;
+            }
+
             _isPreloadReady = false;
 
             _crossfadeCoroutine = StartCoroutine(CrossfadeCoroutine());
@@ -445,9 +459,20 @@ public class VideoManager : MonoBehaviour
             yield break;
         }
 
-        // ★ Fallback 프리로딩 중 소리 겹침 방지: 볼륨 0으로 뮤트
-        _backgroundPlayer.Control.SetVolume(0f);
-        _backgroundPlayer.Control.Play();
+        // ★ Fallback 프리로딩: Control null 안전 접근
+        if (_backgroundPlayer.Control != null)
+        {
+            _backgroundPlayer.Control.SetVolume(0f);
+            _backgroundPlayer.Control.Play();
+        }
+        else
+        {
+            Debug.LogError("[VideoManager] Fallback 프리로드 실패: Control이 null입니다.");
+            _isCrossfading = false;
+            _isIdleSelfCrossfading = false;
+            _preloadCoroutine = null;
+            yield break;
+        }
 
         // 첫 프레임 렌더링 대기 (검은 화면 차단)
         elapsed = 0f;
@@ -481,66 +506,89 @@ public class VideoManager : MonoBehaviour
         if (UIManager.Instance != null)
             UIManager.Instance.SetTouchLock(true);
 
-        // 첫 번째 시퀀스 크로스페이드에서만 결과 패널 표시
-        if (_isSequencePlaying && _currentSequenceIndex == 0 && UIManager.Instance != null)
+        // ★ 코루틴이 어떤 이유로든 죽어도 반드시 상태를 복구하기 위한 안전장치
+        bool cleanupNeeded = true;
+        try
         {
-            UIManager.Instance.ShowResultPanel();
+            // 첫 번째 시퀀스 크로스페이드에서만 결과 패널 표시
+            if (_isSequencePlaying && _currentSequenceIndex == 0 && UIManager.Instance != null)
+            {
+                UIManager.Instance.ShowResultPanel();
+            }
+
+            // ★ 크로스페이드 시작: 오디오도 함께 페이드 (Control null 안전 접근)
+            _activePlayer.Control?.SetVolume(1f);
+            _backgroundPlayer.Control?.SetVolume(0f);
+
+            float elapsed = 0f;
+
+            while (elapsed < _crossfadeTime)
+            {
+                elapsed += Time.deltaTime;
+                float t = Mathf.Clamp01(elapsed / _crossfadeTime);
+
+                // 비주얼 크로스페이드
+                _activeCanvasGroup.alpha = 1f - t;
+                _backgroundCanvasGroup.alpha = t;
+
+                // 오디오 크로스페이드 (Control null 안전 접근)
+                _activePlayer.Control?.SetVolume(1f - t);
+                _backgroundPlayer.Control?.SetVolume(t);
+
+                yield return null;
+            }
+
+            _activeCanvasGroup.alpha = 0f;
+            _backgroundCanvasGroup.alpha = 1f;
+
+            // ★ 오디오 최종 상태 보장 (Control null 안전 접근)
+            _activePlayer.Control?.SetVolume(0f);
+            _backgroundPlayer.Control?.SetVolume(1f);
+
+            // 이전 활성 플레이어 VRAM 해제
+            _activePlayer.CloseMedia();
+
+            // 역할 교체
+            SwapPlayers();
+
+            cleanupNeeded = false; // 정상 완료 시 별도 복구 불필요
+        }
+        finally
+        {
+            // ★ 코루틴이 예외로 죽어도 반드시 실행되어 앱 프리징을 방지
+            _isCrossfading = false;
+            _isIdleSelfCrossfading = false;
+            _crossfadeCoroutine = null;
+
+            if (cleanupNeeded)
+            {
+                // 비정상 종료 시 안전한 상태로 복구
+                Debug.LogError("[VideoManager] 크로스페이드 중 예외 발생! 안전 복구를 수행합니다.");
+                _activeCanvasGroup.alpha = 1f;
+                _backgroundCanvasGroup.alpha = 0f;
+                _backgroundPlayer.CloseMedia();
+                _activePlayer.Control?.SetVolume(1f);
+            }
+
+            // Watchdog 감시 대상 변경
+            if (watchdog != null)
+                watchdog.SetTarget(_activePlayer);
+
+            // 터치 입력 잠금 해제 (반드시 실행되어야 함)
+            if (UIManager.Instance != null)
+                UIManager.Instance.SetTouchLock(false);
         }
 
-        // ★ 크로스페이드 시작: 오디오도 함께 페이드 (소리 겹침 방지)
-        _activePlayer.Control.SetVolume(1f);
-        _backgroundPlayer.Control.SetVolume(0f);
-
-        float elapsed = 0f;
-
-        while (elapsed < _crossfadeTime)
+        // ★ 정상 완료 시에만 다음 프리로드 시작 (finally 밖에서 실행)
+        if (!cleanupNeeded)
         {
-            elapsed += Time.deltaTime;
-            float t = Mathf.Clamp01(elapsed / _crossfadeTime);
+            Debug.Log("[VideoManager] 크로스페이드 완료. 플레이어 역할 교체됨.");
 
-            // 비주얼 크로스페이드
-            _activeCanvasGroup.alpha = 1f - t;
-            _backgroundCanvasGroup.alpha = t;
-
-            // 오디오 크로스페이드
-            _activePlayer.Control.SetVolume(1f - t);
-            _backgroundPlayer.Control.SetVolume(t);
-
-            yield return null;
-        }
-
-        _activeCanvasGroup.alpha = 0f;
-        _backgroundCanvasGroup.alpha = 1f;
-
-        // ★ 오디오 최종 상태 보장
-        _activePlayer.Control.SetVolume(0f);
-        _backgroundPlayer.Control.SetVolume(1f);
-
-        // 이전 활성 플레이어 VRAM 해제
-        _activePlayer.CloseMedia();
-
-        // 역할 교체
-        SwapPlayers();
-
-        _isCrossfading = false;
-        _isIdleSelfCrossfading = false;
-        _crossfadeCoroutine = null;
-
-        // Watchdog 감시 대상 변경
-        if (watchdog != null)
-            watchdog.SetTarget(_activePlayer);
-
-        Debug.Log("[VideoManager] 크로스페이드 완료. 플레이어 역할 교체됨.");
-
-        // 터치 입력 잠금 해제
-        if (UIManager.Instance != null)
-            UIManager.Instance.SetTouchLock(false);
-
-        // ★ 크로스페이드 완료 즉시 → 다음 영상을 백그라운드에 미리 로딩!
-        string nextPath = GetNextVideoPath();
-        if (!string.IsNullOrEmpty(nextPath))
-        {
-            PreloadNextVideoImmediately(nextPath);
+            string nextPath = GetNextVideoPath();
+            if (!string.IsNullOrEmpty(nextPath))
+            {
+                PreloadNextVideoImmediately(nextPath);
+            }
         }
     }
 
@@ -550,6 +598,8 @@ public class VideoManager : MonoBehaviour
     {
         if (eventType == MediaPlayerEvent.EventType.FinishedPlaying && mp == _activePlayer)
         {
+            // ★ 프리로드/크로스페이드 코루틴이 이미 진행 중이면 이벤트 무시 (경쟁 조건 방지)
+            if (_preloadCoroutine != null || _crossfadeCoroutine != null) return;
             OnCurrentVideoFinished();
         }
 

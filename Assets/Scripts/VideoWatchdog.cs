@@ -138,15 +138,28 @@ public class VideoWatchdog : MonoBehaviour
     {
         if (_targetPlayer == null) return;
 
-        // 현재 재생 중인 영상의 경로를 저장
-        string currentPath = _targetPlayer.MediaPath.Path;
-        bool isLooping = _targetPlayer.Loop;
+        // ★ MediaPath 접근 시 NullReferenceException 방어
+        string currentPath = null;
+        try
+        {
+            currentPath = _targetPlayer.MediaPath?.Path;
+        }
+        catch (System.Exception e)
+        {
+            Debug.LogError($"[VideoWatchdog] MediaPath 접근 중 에러: {e.Message}");
+        }
 
         if (string.IsNullOrEmpty(currentPath))
         {
             Debug.LogError("[VideoWatchdog] 강제 복구 실패: 현재 영상 경로를 알 수 없습니다.");
+            // ★ 복구 불가 → 감시 자동 중단 (무한 재시도 방지)
+            // 다음 크로스페이드 완료 시 SetTarget()에서 감시가 자동 재개됩니다.
+            _isMonitoring = false;
+            Debug.LogWarning("[VideoWatchdog] 감시 자동 중단. 다음 크로스페이드에서 재개됩니다.");
             return;
         }
+
+        bool isLooping = _targetPlayer.Loop;
 
         // 영상 완전 해제 후 재로드
         _targetPlayer.CloseMedia();

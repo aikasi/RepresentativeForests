@@ -92,6 +92,9 @@ public class Logger : MonoBehaviour
         logQueue.Enqueue(log);
     }
 
+    // ★ StringBuilder를 필드로 캐싱하여 GC 압력 제거 (매 프레임 힙 할당 방지)
+    private readonly StringBuilder _logBuffer = new StringBuilder(1024);
+
     private void Update()
     {
         if (writer == null || finishing) return;
@@ -101,15 +104,18 @@ public class Logger : MonoBehaviour
         if (logQueue.IsEmpty) return;
 
         // 큐에서 안전하게 꺼내기 (스레드 안전)
-        var sb = new StringBuilder();
+        _logBuffer.Clear();
         while (logQueue.TryDequeue(out string entry))
-            sb.AppendLine(entry);
-        writeTask = WriteAndFlushAsync(sb.ToString());
-        async Task WriteAndFlushAsync(string text)
-        {
-            await writer.WriteAsync(text);
-            await writer.FlushAsync();
-        }
+            _logBuffer.AppendLine(entry);
+        string text = _logBuffer.ToString();
+        writeTask = WriteAndFlushAsyncInternal(text);
+    }
+
+    // ★ 로컬 함수 대신 인스턴스 메서드로 분리 (async 상태 머신의 불필요한 클로저 캡처 방지)
+    private async Task WriteAndFlushAsyncInternal(string text)
+    {
+        await writer.WriteAsync(text);
+        await writer.FlushAsync();
     }
 
     private void FinishWriting()

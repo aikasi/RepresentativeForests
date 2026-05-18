@@ -4,7 +4,9 @@
   <Project Path="AVProVideo.Demos.csproj" />
   <Project Path="AVProVideo.Editor.csproj" />
   <Project Path="AVProVideo.Runtime.csproj" />
+  <Project Path="AllIn1SpriteShaderAssembly.csproj" />
   <Project Path="_AVProVideo.Extensions.VideoPlayer.Editor.csproj" />
+  <Project Path="Elringus.SpriteGlow.Runtime.csproj" />
   <Project Path="AVProVideo.Extensions.Timeline.csproj" />
   <Project Path="AVProVideo.Extensions.UnityUI.csproj" />
   <Project Path="AVProVideo.Extensions.VisualEffectGraph.csproj" />

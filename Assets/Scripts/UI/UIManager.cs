@@ -28,7 +28,17 @@ public class UIManager : MonoBehaviour
 
     [Header("===== 공통 버튼 참조 =====")]
     [SerializeField] private Button startButton;         // 대기 화면의 시작 버튼
-    [SerializeField] private Button homeButton;          // 결과 화면의 처음으로(홈) 버튼
+    [SerializeField] private Button homeButton;          // 결과 화면의 처음으로(홈) 버튼 (resultPanel 자식)
+
+    [Header("===== 퀴즈 중 홈 버튼 (별도 디자인) =====")]
+    [Tooltip("퀴즈 진행 중(Q1~Q4) 표시되는 홈 버튼. 결과 화면 홈 버튼과 디자인이 다르므로 별도 배치.")]
+    [SerializeField] private Button quizHomeButton;
+    [Tooltip("퀴즈 홈 버튼의 CanvasGroup. 퀴즈 패널에서만 보이고, 나머지에서 숨김.")]
+    [SerializeField] private CanvasGroup quizHomeButtonCanvasGroup;
+
+    [Header("===== 프로그래스 UI =====")]
+    [Tooltip("ProgressUI 컴포넌트를 연결합니다. (퀴즈 진행도 표시용)")]
+    [SerializeField] private ProgressUI progressUI;
 
     [Header("===== 터치 잠금 (크로스페이드 중 입력 차단) =====")]
     [Tooltip("터치 캔버스의 최상위 CanvasGroup. 잠금 시 interactable=false로 전체 입력 차단.")]
@@ -107,6 +117,10 @@ public class UIManager : MonoBehaviour
 
         if (homeButton != null)
             homeButton.onClick.AddListener(OnHomeButtonClicked);
+
+        // 퀴즈 중 홈 버튼도 같은 핸들러에 바인딩 (디자인만 다르고 기능은 동일)
+        if (quizHomeButton != null)
+            quizHomeButton.onClick.AddListener(OnHomeButtonClicked);
 
         // 퀴즈 완료 이벤트 구독
         if (QuizManager.Instance != null)
@@ -214,6 +228,10 @@ public class UIManager : MonoBehaviour
             {
                 ShowPanel(_quizPanels[nextIndex]);
                 Debug.Log($"[UIManager] Q{nextIndex + 1} 패널로 전환합니다.");
+
+                // 프로그래스 UI 업데이트 (0-indexed: Q2진입=인덱스 1)
+                if (progressUI != null)
+                    progressUI.SetStep(nextIndex);
             }
         }
         // 마지막 문항이면 OnQuizCompleted 이벤트가 자동으로 처리
@@ -257,9 +275,14 @@ public class UIManager : MonoBehaviour
         if (QuizManager.Instance != null)
             QuizManager.Instance.ResetQuiz();
 
-        // 영상 재생 중단 + 대기 영상으로 크로스페이드 복귀
-        if (VideoManager.Instance != null)
+        // ★ 결과 영상 시퀀스가 재생 중일 때만 영상을 인터럽트
+        // 퀴즈 진행 중에는 대기 영상이 이미 재생 중이므로 건드리지 않음
+        if (VideoManager.Instance != null && VideoManager.Instance.IsSequencePlaying)
             VideoManager.Instance.InterruptAndReturnToIdle();
+
+        // 프로그래스 UI 숨김
+        if (progressUI != null)
+            progressUI.Hide();
 
         ShowPanel(standbyPanel);
         Debug.Log("[UIManager] 대기 화면으로 복귀 (홈 버튼).");
@@ -280,6 +303,10 @@ public class UIManager : MonoBehaviour
         // 결과 이미지 VRAM 해제
         UnloadCurrentResultImage();
 
+        // 프로그래스 UI 숨김
+        if (progressUI != null)
+            progressUI.Hide();
+
         ShowPanel(standbyPanel);
         Debug.Log("[UIManager] 대기 화면으로 복귀 (영상 시퀀스 완료).");
     }
@@ -298,6 +325,14 @@ public class UIManager : MonoBehaviour
             QuizManager.Instance.ResetQuiz();
 
         ShowPanel(q1Panel);
+
+        // 프로그래스 UI 초기 상태 표시 (Q1 진입)
+        if (progressUI != null)
+        {
+            progressUI.SetStep(0);
+            progressUI.Show();
+        }
+
         Debug.Log("[UIManager] 시작 버튼 클릭 → Q1 퀴즈 화면으로 전환.");
     }
 
@@ -405,8 +440,20 @@ public class UIManager : MonoBehaviour
             _panelCanvasGroups[i].interactable = isTarget;
         }
 
-        // 대기 화면 여부 업데이트 (무입력 타이머 제어용)
-        _isOnStandby = (targetPanel == standbyPanel);
+        // ★ 퀴즈 중 홈 버튼 가시성 제어: 퀴즈 패널(Q1~Q4)에서만 표시
+        // (결과 화면 홈 버튼은 resultPanel 자식이므로 패널 전환 시 자동으로 보임/숨김)
+        bool isQuizPanel = (targetPanel == q1Panel || targetPanel == q2Panel ||
+                            targetPanel == q3Panel || targetPanel == q4Panel);
+        if (quizHomeButtonCanvasGroup != null)
+        {
+            quizHomeButtonCanvasGroup.alpha = isQuizPanel ? 1f : 0f;
+            quizHomeButtonCanvasGroup.blocksRaycasts = isQuizPanel;
+            quizHomeButtonCanvasGroup.interactable = isQuizPanel;
+        }
+
+        // 대기 화면 또는 결과 화면에서는 무입력 타이머 비활성화
+        // (결과 화면: 영상 시퀀스 완료 시 ShowStandbyPanelOnly()로 자동 복귀)
+        _isOnStandby = (targetPanel == standbyPanel || targetPanel == resultPanel);
         _inactivityTimer = 0f;
     }
 }

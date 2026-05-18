@@ -14,8 +14,8 @@ public class MediaScanner : MonoBehaviour
 {
     public static MediaScanner Instance { get; private set; }
 
-    // 대기 영상 경로 (00.xxx)
-    public string IdleVideoPath { get; private set; }
+    // 대기 영상 경로 리스트 (00.xxx, 00-1.xxx 등을 재생 순서대로 저장)
+    public List<string> IdleVideoPaths { get; private set; } = new List<string>();
 
     // 결과 영상 캐시: Key = 결과 카테고리 ID, Value = 재생 순서대로 정렬된 절대 경로 리스트
     public Dictionary<int, List<string>> ResultVideos { get; private set; } = new Dictionary<int, List<string>>();
@@ -35,6 +35,9 @@ public class MediaScanner : MonoBehaviour
 
     // 대기 영상 파일명 정규식 패턴: "00" (확장자 제외)
     private static readonly Regex IdleFilePattern = new Regex(@"^0+$", RegexOptions.Compiled);
+
+    // 대기 영상 시퀀스 파일명 정규식 패턴: "00-1", "00-2" 등 (0으로만 이루어진 접두사 + 순서 번호)
+    private static readonly Regex IdleSequencePattern = new Regex(@"^(0+)-(\d+)$", RegexOptions.Compiled);
 
     private void Awake()
     {
@@ -122,12 +125,16 @@ public class MediaScanner : MonoBehaviour
             // 대기 영상(00) 분류
             if (IdleFilePattern.IsMatch(fileNameNoExt))
             {
-                if (!string.IsNullOrEmpty(IdleVideoPath))
-                {
-                    Debug.LogWarning($"[MediaScanner] 대기 영상이 2개 이상 발견되었습니다. 마지막 파일을 사용합니다: {Path.GetFileName(filePath)}");
-                }
-                IdleVideoPath = filePath;
+                IdleVideoPaths.Add(filePath);
                 Debug.Log($"[MediaScanner] 대기 영상 확인: {Path.GetFileName(filePath)}");
+                continue;
+            }
+
+            // 대기 영상 시퀀스(00-1, 00-2 등) 분류
+            if (IdleSequencePattern.IsMatch(fileNameNoExt))
+            {
+                IdleVideoPaths.Add(filePath);
+                Debug.Log($"[MediaScanner] 대기 영상(시퀀스) 확인: {Path.GetFileName(filePath)}");
                 continue;
             }
 
@@ -151,12 +158,23 @@ public class MediaScanner : MonoBehaviour
         }
 
         // 대기 영상 존재 여부 최종 확인
-        if (string.IsNullOrEmpty(IdleVideoPath))
+        if (IdleVideoPaths.Count == 0)
         {
             AddCriticalError("대기 영상(00.mp4 등)을 찾을 수 없습니다. Videos 폴더를 확인하세요.");
             OnCriticalError?.Invoke(ErrorMessages);
             return;
         }
+
+        // ========== 대기 영상 리스트 재생 순서 정렬 (00 → 00-1 → 00-2 순) ==========
+        IdleVideoPaths.Sort((a, b) =>
+        {
+            int orderA = ExtractIdleOrder(a);
+            int orderB = ExtractIdleOrder(b);
+            return orderA.CompareTo(orderB);
+        });
+
+        string idleFileList = string.Join(", ", IdleVideoPaths.Select(Path.GetFileName));
+        Debug.Log($"[MediaScanner] 대기 영상 {IdleVideoPaths.Count}개 캐싱 완료 → [{idleFileList}]");
 
         // ========== 각 카테고리 내부 재생 순서 정렬 ==========
 
@@ -175,7 +193,7 @@ public class MediaScanner : MonoBehaviour
             Debug.Log($"[MediaScanner] 결과 {kvp.Key:D2}번: {kvp.Value.Count}개 영상 캐싱 완료 → [{fileList}]");
         }
 
-        Debug.Log($"[MediaScanner] 스캔 완료! 대기영상 1개 + 결과 카테고리 {ResultVideos.Count}개 캐싱됨.");
+        Debug.Log($"[MediaScanner] 스캔 완료! 대기영상 {IdleVideoPaths.Count}개 + 결과 카테고리 {ResultVideos.Count}개 캐싱됨.");
     }
 
     /// <summary>
@@ -190,6 +208,25 @@ public class MediaScanner : MonoBehaviour
         {
             return order;
         }
+        return int.MaxValue; // 파싱 실패 시 맨 뒤로 밀기
+    }
+
+    /// <summary>
+    /// 대기 영상 파일 경로에서 순서 번호를 추출합니다.
+    /// "00" → 0, "00-1" → 1, "00-2" → 2
+    /// </summary>
+    private int ExtractIdleOrder(string filePath)
+    {
+        string nameNoExt = Path.GetFileNameWithoutExtension(filePath);
+
+        // "00" 패턴 → 기본 대기 영상 (순서 0)
+        if (IdleFilePattern.IsMatch(nameNoExt)) return 0;
+
+        // "00-1" 패턴 → 시퀀스 순서 번호 반환
+        Match match = IdleSequencePattern.Match(nameNoExt);
+        if (match.Success && int.TryParse(match.Groups[2].Value, out int order))
+            return order;
+
         return int.MaxValue; // 파싱 실패 시 맨 뒤로 밀기
     }
 

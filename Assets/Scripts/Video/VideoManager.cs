@@ -48,6 +48,12 @@ public class VideoManager : MonoBehaviour
     private bool _isIdleSelfCrossfading = false;
     private bool _isPreloadReady = false; // 백그라운드 플레이어가 첫 프레임까지 준비 완료
 
+    // 대기 영상 다중 루프용 인덱스 (IdleVideoPaths 리스트 내 현재 위치)
+    private int _idleSequenceIndex = 0;
+
+    // 외부에서 현재 결과 영상 시퀀스 재생 중인지 확인 (퀴즈 중 홈 버튼 분기용)
+    public bool IsSequencePlaying => _isSequencePlaying;
+
     // 코루틴 참조 (인터럽트용)
     private Coroutine _crossfadeCoroutine;
     private Coroutine _preloadCoroutine;
@@ -97,13 +103,13 @@ public class VideoManager : MonoBehaviour
     {
         float timeout = 5f;
         float elapsed = 0f;
-        while ((MediaScanner.Instance == null || string.IsNullOrEmpty(MediaScanner.Instance.IdleVideoPath)) && elapsed < timeout)
+        while ((MediaScanner.Instance == null || MediaScanner.Instance.IdleVideoPaths == null || MediaScanner.Instance.IdleVideoPaths.Count == 0) && elapsed < timeout)
         {
             elapsed += Time.deltaTime;
             yield return null;
         }
 
-        if (MediaScanner.Instance == null || string.IsNullOrEmpty(MediaScanner.Instance.IdleVideoPath))
+        if (MediaScanner.Instance == null || MediaScanner.Instance.IdleVideoPaths == null || MediaScanner.Instance.IdleVideoPaths.Count == 0)
         {
             Debug.LogError("[VideoManager] MediaScanner 준비 타임아웃! 대기 영상을 재생할 수 없습니다.");
             yield break;
@@ -128,7 +134,7 @@ public class VideoManager : MonoBehaviour
     /// </summary>
     public void StartIdleVideo()
     {
-        if (MediaScanner.Instance == null || string.IsNullOrEmpty(MediaScanner.Instance.IdleVideoPath))
+        if (MediaScanner.Instance == null || MediaScanner.Instance.IdleVideoPaths == null || MediaScanner.Instance.IdleVideoPaths.Count == 0)
         {
             Debug.LogError("[VideoManager] 대기 영상 경로를 찾을 수 없습니다!");
             return;
@@ -137,10 +143,13 @@ public class VideoManager : MonoBehaviour
         _isSequencePlaying = false;
         _currentSequence = null;
         _isPreloadReady = false;
+        _idleSequenceIndex = 0;
+
+        string firstIdlePath = MediaScanner.Instance.IdleVideoPaths[0];
 
         _activePlayer.Loop = false;
         bool opened = _activePlayer.OpenMedia(
-            new MediaPath(MediaScanner.Instance.IdleVideoPath, MediaPathType.AbsolutePathOrURL),
+            new MediaPath(firstIdlePath, MediaPathType.AbsolutePathOrURL),
             autoPlay: true
         );
 
@@ -150,10 +159,10 @@ public class VideoManager : MonoBehaviour
             return;
         }
 
-        Debug.Log("[VideoManager] 대기 영상 재생 시작. (백그라운드 프리로드는 안정화 후 진행)");
+        Debug.Log($"[VideoManager] 대기 영상 재생 시작: {System.IO.Path.GetFileName(firstIdlePath)} (백그라운드 프리로드는 안정화 후 진행)");
 
         // ★ 즉시 로딩하지 않고, PlayerA가 완전히 화면에 뜨고 안정화되면 프리로드 시작
-        _delayedPreloadCoroutine = StartCoroutine(DelayedPreloadIdleVideo(MediaScanner.Instance.IdleVideoPath));
+        _delayedPreloadCoroutine = StartCoroutine(DelayedPreloadIdleVideo(GetNextIdleVideoPath()));
     }
 
     /// <summary>
@@ -234,13 +243,18 @@ public class VideoManager : MonoBehaviour
         _isIdleSelfCrossfading = false;
         _isPreloadReady = false;
         _currentSequence = null;
+        _idleSequenceIndex = 0;
 
         _backgroundPlayer.CloseMedia();
 
         // ★ 볼륨 복원 안전장치: 활성 플레이어 볼륨 1로 보장
         _activePlayer.Control?.SetVolume(1f);
 
-        PreloadAndCrossfade(MediaScanner.Instance.IdleVideoPath, false);
+        string firstIdle = GetFirstIdleVideoPath();
+        if (!string.IsNullOrEmpty(firstIdle))
+            PreloadAndCrossfade(firstIdle, false);
+        else
+            Debug.LogError("[VideoManager] 대기 영상 경로를 찾을 수 없어 복귀 실패!");
     }
 
     // ========== 사전 로딩 (즉시 트리거) ==========
@@ -272,11 +286,11 @@ public class VideoManager : MonoBehaviour
             if (nextIndex < _currentSequence.Count)
                 return _currentSequence[nextIndex];
             else
-                return MediaScanner.Instance?.IdleVideoPath; // 마지막 영상 → 대기 복귀
+                return GetFirstIdleVideoPath(); // 마지막 영상 → 대기 복귀
         }
 
-        // 대기 모드: 같은 대기 영상
-        return MediaScanner.Instance?.IdleVideoPath;
+        // 대기 모드: 다음 대기 영상 (순환)
+        return GetNextIdleVideoPath();
     }
 
     /// <summary>
@@ -632,9 +646,11 @@ public class VideoManager : MonoBehaviour
                 Debug.Log("[VideoManager] 시퀀스 완료! 대기 영상으로 복귀.");
                 _isSequencePlaying = false;
                 _currentSequence = null;
+                _idleSequenceIndex = 0;
 
-                if (MediaScanner.Instance != null && !string.IsNullOrEmpty(MediaScanner.Instance.IdleVideoPath))
-                    PreloadAndCrossfade(MediaScanner.Instance.IdleVideoPath, false);
+                string firstIdle = GetFirstIdleVideoPath();
+                if (!string.IsNullOrEmpty(firstIdle))
+                    PreloadAndCrossfade(firstIdle, false);
                 else
                     Debug.LogError("[VideoManager] 대기 영상 경로를 찾을 수 없어 복귀 실패!");
 
@@ -650,13 +666,17 @@ public class VideoManager : MonoBehaviour
                 }
             }
         }
-        // ===== 대기 모드: 셀프 크로스페이드 =====
+        // ===== 대기 모드: 다음 대기 영상으로 크로스페이드 루프 =====
         else
         {
-            Debug.Log("[VideoManager] 대기 영상 끝 → 셀프 크로스페이드 루프.");
+            if (MediaScanner.Instance != null && MediaScanner.Instance.IdleVideoPaths != null && MediaScanner.Instance.IdleVideoPaths.Count > 0)
+            {
+                var idlePaths = MediaScanner.Instance.IdleVideoPaths;
+                _idleSequenceIndex = (_idleSequenceIndex + 1) % idlePaths.Count;
 
-            if (MediaScanner.Instance != null && !string.IsNullOrEmpty(MediaScanner.Instance.IdleVideoPath))
-                PreloadAndCrossfade(MediaScanner.Instance.IdleVideoPath, true);
+                Debug.Log($"[VideoManager] 대기 영상 끝 → 다음 대기 영상 크로스페이드: {System.IO.Path.GetFileName(idlePaths[_idleSequenceIndex])} ({_idleSequenceIndex + 1}/{idlePaths.Count})");
+                PreloadAndCrossfade(idlePaths[_idleSequenceIndex], true);
+            }
         }
     }
 
@@ -666,5 +686,30 @@ public class VideoManager : MonoBehaviour
     {
         (_activePlayer, _backgroundPlayer) = (_backgroundPlayer, _activePlayer);
         (_activeCanvasGroup, _backgroundCanvasGroup) = (_backgroundCanvasGroup, _activeCanvasGroup);
+    }
+
+    // ========== 대기 영상 경로 헬퍼 ==========
+
+    /// <summary>
+    /// 대기 영상 리스트의 첫 번째 경로를 반환합니다. (초기화/복귀 시 사용)
+    /// </summary>
+    private string GetFirstIdleVideoPath()
+    {
+        if (MediaScanner.Instance != null && MediaScanner.Instance.IdleVideoPaths != null && MediaScanner.Instance.IdleVideoPaths.Count > 0)
+            return MediaScanner.Instance.IdleVideoPaths[0];
+        return null;
+    }
+
+    /// <summary>
+    /// 현재 인덱스 기준으로 다음 대기 영상 경로를 반환합니다. (프리로드용, 순환)
+    /// </summary>
+    private string GetNextIdleVideoPath()
+    {
+        if (MediaScanner.Instance == null || MediaScanner.Instance.IdleVideoPaths == null || MediaScanner.Instance.IdleVideoPaths.Count == 0)
+            return null;
+
+        var idlePaths = MediaScanner.Instance.IdleVideoPaths;
+        int nextIndex = (_idleSequenceIndex + 1) % idlePaths.Count;
+        return idlePaths[nextIndex];
     }
 }

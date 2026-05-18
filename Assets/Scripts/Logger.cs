@@ -142,4 +142,11 @@ public class Logger : MonoBehaviour
         finishing = true;
         FinishWriting();
     }
+
+    // OnApplicationQuit이 보장되지 않는 상황(강제 종료, 크래시) 대비 안전장치
+    private void OnDestroy()
+    {
+        finishing = true;
+        FinishWriting();
+    }
 }

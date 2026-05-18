@@ -5,7 +5,7 @@ UseSubMonitor, true
 SubResolutionX, 1920
 SubResolutionY, 1080
 FullScreen, true, 전체화면 여부 (true 또는 false로 입력하세요)
-HideCursor,true, 마우스감추는 효과 적용 여부
+HideCursor,false, 마우스감추는 효과 적용 여부
 --------- 비디오 설정 ---------
 CrossfadeTime, 1.0, 부드럽게 전환되는 시간(초)
 WatchdogTimeout, 0.3, 영상이 멈췄는지 감시하는 시간 기준

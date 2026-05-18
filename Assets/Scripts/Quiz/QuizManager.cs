@@ -198,7 +198,9 @@ public class QuizManager : MonoBehaviour
         IsQuizCompleted = false;
         VideoId = null;
         ImageId = null;
-        _userAnswers = new string[TotalQuestions];
+        // 배열 재생성 대신 기존 배열 재사용 (GC 압력 제거)
+        for (int i = 0; i < _userAnswers.Length; i++)
+            _userAnswers[i] = null;
         Debug.Log("[QuizManager] 퀴즈 상태가 초기화되었습니다.");
     }
 

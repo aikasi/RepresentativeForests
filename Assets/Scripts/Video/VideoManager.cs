@@ -342,8 +342,10 @@ public class VideoManager : MonoBehaviour
             yield return null;
         }
 
-        // 첫 프레임 완료 → 일시정지 (크로스페이드 시점까지 대기)
+        // 첫 프레임 완료 → 일시정지 후 처음으로 되돌리기
+        // ★ AVPro의 Pause()가 즉시 반영되지 않아 영상이 진행될 수 있으므로 Seek(0)으로 보정
         _backgroundPlayer.Control.Pause();
+        _backgroundPlayer.Control.Seek(0);
 
         _isPreloadReady = true;
         _preloadCoroutine = null;
@@ -422,6 +424,8 @@ public class VideoManager : MonoBehaviour
             // ★ Control null 안전 접근 (ForceReload 등 외부 간섭 방어)
             if (_backgroundPlayer.Control != null)
             {
+                // ★ Pause 후에도 영상이 진행되었을 수 있으므로 처음으로 되돌린 후 재생
+                _backgroundPlayer.Control.Seek(0);
                 _backgroundPlayer.Control.Play();
             }
             else

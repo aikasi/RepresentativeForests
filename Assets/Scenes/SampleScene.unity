@@ -4109,10 +4109,10 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: c847e1834e649ce4bb781c3d3dd9d775, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::ImageAlphaPulse
-  pulseSpeed: 2.95
+  pulseSpeed: 3.3
   minAlpha: 0
   maxAlpha: 1
-  syncPulse: 0
+  syncPulse: 1
 --- !u!114 &1438208911
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -5384,10 +5384,10 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: c847e1834e649ce4bb781c3d3dd9d775, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::ImageAlphaPulse
-  pulseSpeed: 2.95
+  pulseSpeed: 3.3
   minAlpha: 0
   maxAlpha: 1
-  syncPulse: 0
+  syncPulse: 1
 --- !u!1 &1905733787
 GameObject:
   m_ObjectHideFlags: 0

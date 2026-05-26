@@ -30,6 +30,12 @@ public class UIManager : MonoBehaviour
     [SerializeField] private Button startButton;         // 대기 화면의 시작 버튼
     [SerializeField] private Button homeButton;          // 결과 화면의 처음으로(홈) 버튼 (resultPanel 자식)
 
+    [Header("===== 유형별 숲 바로가기 =====")]
+    [Tooltip("대기 화면의 '유형별 숲 바로가기' 버튼")]
+    [SerializeField] private Button shortcutOpenButton;
+    [Tooltip("바로가기 패널을 제어하는 ForestShortcutUI 컴포넌트")]
+    [SerializeField] private ForestShortcutUI forestShortcutUI;
+
     [Header("===== 퀴즈 중 홈 버튼 (별도 디자인) =====")]
     [Tooltip("퀴즈 진행 중(Q1~Q4) 표시되는 홈 버튼. 결과 화면 홈 버튼과 디자인이 다르므로 별도 배치.")]
     [SerializeField] private Button quizHomeButton;
@@ -114,6 +120,9 @@ public class UIManager : MonoBehaviour
         // 버튼 이벤트 바인딩
         if (startButton != null)
             startButton.onClick.AddListener(OnStartButtonClicked);
+
+        if (shortcutOpenButton != null)
+            shortcutOpenButton.onClick.AddListener(OnShortcutOpenButtonClicked);
 
         if (homeButton != null)
             homeButton.onClick.AddListener(OnHomeButtonClicked);
@@ -262,6 +271,10 @@ public class UIManager : MonoBehaviour
     /// </summary>
     public void ReturnToStandby()
     {
+        // 바로가기 패널이 열려있으면 안전하게 닫기 (영상 인터럽트는 아래에서 처리)
+        if (forestShortcutUI != null)
+            forestShortcutUI.ForceClose();
+
         // 진행 중인 로딩 코루틴이 있으면 즉시 중단 (홈 버튼 인터럽트 대비)
         if (_loadingCoroutine != null)
         {
@@ -345,6 +358,31 @@ public class UIManager : MonoBehaviour
 
         ReturnToStandby();
         Debug.Log("[UIManager] 홈 버튼 클릭 → 대기 화면으로 복귀.");
+    }
+
+    /// <summary>
+    /// '유형별 숲 바로가기' 버튼 클릭 시 호출됩니다.
+    /// </summary>
+    private void OnShortcutOpenButtonClicked()
+    {
+        if (_isTransitioning) return;
+
+        if (forestShortcutUI != null)
+        {
+            forestShortcutUI.Open();
+            Debug.Log("[UIManager] 유형별 숲 바로가기 패널 열기.");
+        }
+    }
+
+    /// <summary>
+    /// ForestShortcutUI의 뒤로가기 또는 무입력 타이머에서 호출됩니다.
+    /// 바로가기 패널이 닫힌 후 대기 화면 상태를 정상화합니다.
+    /// </summary>
+    public void OnShortcutPanelClosed()
+    {
+        Debug.Log("[UIManager] 바로가기 패널 닫힘 → 대기 화면 정상화.");
+        // _isOnStandby는 이미 true (오버레이 방식이므로 ShowPanel 미호출)
+        _inactivityTimer = 0f;
     }
 
     /// <summary>

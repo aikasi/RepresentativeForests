@@ -119,32 +119,50 @@ Shader "UI/OuterGlow"
 
             fixed4 frag(v2f IN) : SV_Target
             {
-                // 방사형 2링 x 12방향 = 24 샘플 블러
+                // 방사형 5링 x 12방향 = 60 샘플 + 중심 1 = 61 샘플
+                // 각 링에 거리 기반 가우시안 가중치 적용 → 외곽이 자연스럽게 감쇠
                 float blurredAlpha = 0.0;
+                float totalWeight = 0.0;
                 const int DIR = 12;
                 const float TWO_PI = 6.28318530718;
 
-                // 내부 링 (50% 거리, 가중치 2배)
-                for (int i = 0; i < DIR; i++)
+                // 5개 링의 거리 비율 (0.0 ~ 1.0)
+                // 내부는 촘촘하게, 외부는 넓게 분포하여 그라디언트를 부드럽게 채움
+                const float ringDist[5] = { 0.15, 0.35, 0.55, 0.78, 1.0 };
+
+                // 중심 샘플 (가우시안 가중치 최대)
+                float centerWeight = 1.0;
+                blurredAlpha += sampleAlpha(IN.texcoord) * centerWeight;
+                totalWeight += centerWeight;
+
+                // 5개 링을 순회하며 가우시안 가중치 적용
+                for (int ring = 0; ring < 5; ring++)
                 {
-                    float a = i * TWO_PI / DIR;
-                    float2 d = float2(cos(a), sin(a));
-                    d.y *= _AspectRatio; // 세로 방향 보정 (상하/좌우 균일 두께)
-                    blurredAlpha += sampleAlpha(IN.texcoord + d * _GlowSpread * 0.5) * 2.0;
+                    float dist = ringDist[ring];
+
+                    // 가우시안 가중치: exp(-3.0 * d²) → 중심에서 1.0, 외곽으로 갈수록 부드럽게 0에 수렴
+                    float w = exp(-3.0 * dist * dist);
+
+                    // 각 링마다 방향 오프셋을 엇갈려 배치 (모아레 방지)
+                    float angleOffset = ring * 0.5;
+
+                    for (int i = 0; i < DIR; i++)
+                    {
+                        float a = (i + angleOffset) * TWO_PI / DIR;
+                        float2 d = float2(cos(a), sin(a));
+                        d.y *= _AspectRatio;
+                        blurredAlpha += sampleAlpha(IN.texcoord + d * _GlowSpread * dist) * w;
+                        totalWeight += w;
+                    }
                 }
 
-                // 외부 링 (100% 거리, 가중치 1배)
-                for (int j = 0; j < DIR; j++)
-                {
-                    float a = (j + 0.5) * TWO_PI / DIR;
-                    float2 d = float2(cos(a), sin(a));
-                    d.y *= _AspectRatio; // 세로 방향 보정
-                    blurredAlpha += sampleAlpha(IN.texcoord + d * _GlowSpread);
-                }
+                // 가중 평균
+                blurredAlpha /= totalWeight;
 
-                // 가중 평균 (2+1 = 3배 가중치)
-                blurredAlpha /= (DIR * 3.0);
+                // 소프트니스 커브 (부드러운 감쇠, pow 대신 smoothstep 혼합)
                 blurredAlpha = pow(blurredAlpha, _GlowSoftness);
+                // 최외곽의 미세한 잔여값을 자연스럽게 0으로 마무리
+                blurredAlpha *= smoothstep(0.0, 0.08, blurredAlpha);
 
                 // 현재 픽셀의 원본 알파 (내부인지 판별)
                 float origAlpha = sampleAlpha(IN.texcoord);

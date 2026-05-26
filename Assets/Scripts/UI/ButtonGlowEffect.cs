@@ -17,6 +17,10 @@ public class ButtonGlowEffect : MonoBehaviour
     [Header("===== 글로우 색상 =====")]
     [SerializeField] private Color glowColor = new Color(0.55f, 0.95f, 0.45f, 1f);
 
+    [Header("===== 셀이더 =====")]
+    [Tooltip("UI/OuterGlow 셀이더를 직접 연결합니다. (빌드 시 셀이더 포함 보장)")]
+    [SerializeField] private Shader glowShader;
+
     [Header("===== 셰이더 파라미터 =====")]
     [Tooltip("글로우 퍼짐 범위. 클수록 넓게 퍼짐.")]
     [Range(0.01f, 0.5f)]
@@ -35,6 +39,21 @@ public class ButtonGlowEffect : MonoBehaviour
 
     [Range(0f, 2f)]
     [SerializeField] private float maxIntensity = 0.8f;
+
+    [Header("===== 버튼 이미지 Alpha 맥동 =====")]
+    [Tooltip("활성화 시 sourceImage의 alpha가 글로우와 동기화되어 맥동합니다.")]
+    [SerializeField] private bool enableAlphaPulse = true;
+
+    [Tooltip("alpha 최소값 (가장 투명해지는 시점)")]
+    [Range(0f, 1f)]
+    [SerializeField] private float minAlpha = 0.7f;
+
+    [Tooltip("alpha 최대값 (가장 불투명한 시점)")]
+    [Range(0f, 1f)]
+    [SerializeField] private float maxAlpha = 1f;
+
+    [Tooltip("활성화 시 다른 맥동 스크립트(ImageAlphaPulse, ButtonScalePulse)와 타이밍을 동기화합니다.")]
+    [SerializeField] private bool syncPulse = false;
 
     [Header("===== 디버그 (자동 계산, 읽기 전용) =====")]
     [Tooltip("자동 계산된 마진값 (읽기 전용)")]
@@ -71,7 +90,8 @@ public class ButtonGlowEffect : MonoBehaviour
             return;
         }
 
-        _timeOffset = Random.Range(0f, Mathf.PI * 2f);
+        // syncPulse가 true면 동기화 (오프셋 0), false면 랜덤 위상으로 비동기화
+        _timeOffset = syncPulse ? 0f : Random.Range(0f, Mathf.PI * 2f);
         SetupMaterial();
     }
 
@@ -86,10 +106,9 @@ public class ButtonGlowEffect : MonoBehaviour
     {
         if (sourceImage == null || sourceImage.sprite == null) return;
 
-        Shader glowShader = Shader.Find("UI/OuterGlow");
         if (glowShader == null)
         {
-            Debug.LogError("[ButtonGlowEffect] 'UI/OuterGlow' 셰이더를 찾을 수 없습니다!");
+            Debug.LogError("[ButtonGlowEffect] glowShader가 Inspector에서 연결되지 않았습니다! UIOuterGlow.shader를 드래그해 주세요.");
             enabled = false;
             return;
         }
@@ -126,6 +145,14 @@ public class ButtonGlowEffect : MonoBehaviour
             : 1f;
         float intensity = Mathf.Lerp(minIntensity, maxIntensity, t);
         _materialInstance.SetFloat(PropGlowIntensity, intensity);
+
+        // sourceImage alpha 맥동 (글로우와 동기화된 숨 쉬는 효과)
+        if (enableAlphaPulse && sourceImage != null)
+        {
+            Color srcColor = sourceImage.color;
+            srcColor.a = Mathf.Lerp(minAlpha, maxAlpha, t);
+            sourceImage.color = srcColor;
+        }
     }
 
     /// <summary>
@@ -165,4 +192,12 @@ public class ButtonGlowEffect : MonoBehaviour
             _materialInstance = null;
         }
     }
+
+#if UNITY_EDITOR
+    private void OnValidate()
+    {
+        // Inspector 값 변경 시 다음 프레임에서 셰이더 파라미터 갱신
+        _isDirty = true;
+    }
+#endif
 }

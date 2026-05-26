@@ -48,11 +48,31 @@ public class VideoManager : MonoBehaviour
     private bool _isIdleSelfCrossfading = false;
     private bool _isPreloadReady = false; // 백그라운드 플레이어가 첫 프레임까지 준비 완료
 
+    // 바로가기 모드 플래그 (ForestShortcutUI에서 설정)
+    private bool _isShortcutMode = false;
+
     // 대기 영상 다중 루프용 인덱스 (IdleVideoPaths 리스트 내 현재 위치)
     private int _idleSequenceIndex = 0;
 
     // 외부에서 현재 결과 영상 시퀀스 재생 중인지 확인 (퀴즈 중 홈 버튼 분기용)
     public bool IsSequencePlaying => _isSequencePlaying;
+
+    // 외부에서 크로스페이드 시간 참조 (터치 UI 전환 속도 동기화용)
+    public float CrossfadeTime => _crossfadeTime;
+
+    /// <summary>
+    /// 현재 활성 MediaPlayer의 비디오 텍스처를 반환합니다.
+    /// 터치 화면 미러링(VideoMirrorUI)에서 사용합니다.
+    /// </summary>
+    public Texture CurrentVideoTexture
+    {
+        get
+        {
+            if (_activePlayer != null && _activePlayer.TextureProducer != null)
+                return _activePlayer.TextureProducer.GetTexture();
+            return null;
+        }
+    }
 
     // 코루틴 참조 (인터럽트용)
     private Coroutine _crossfadeCoroutine;
@@ -61,6 +81,9 @@ public class VideoManager : MonoBehaviour
 
     // 영상 시퀀스 완료 시 외부 알림 이벤트
     public event Action OnSequenceCompleted;
+
+    // 바로가기 모드 영상 시퀀스 완료 이벤트 (ForestShortcutUI가 구독)
+    public event Action OnShortcutSequenceCompleted;
 
     private void Awake()
     {
@@ -181,8 +204,10 @@ public class VideoManager : MonoBehaviour
     /// <summary>
     /// 결과 영상 시퀀스 재생을 시작합니다.
     /// </summary>
-    public void StartResultSequence(string resultId)
+    public void StartResultSequence(string resultId, bool isShortcut = false)
     {
+        _isShortcutMode = isShortcut;
+
         if (MediaScanner.Instance == null)
         {
             ErrorPopup.Show("MediaScanner를 찾을 수 없습니다!");
@@ -232,6 +257,8 @@ public class VideoManager : MonoBehaviour
     public void InterruptAndReturnToIdle()
     {
         Debug.Log("[VideoManager] 인터럽트! 대기 영상으로 강제 복귀합니다.");
+
+        _isShortcutMode = false;  // 바로가기 모드 해제
 
         if (watchdog != null)
             watchdog.PauseMonitoring();
@@ -528,8 +555,8 @@ public class VideoManager : MonoBehaviour
         bool cleanupNeeded = true;
         try
         {
-            // 첫 번째 시퀀스 크로스페이드에서만 결과 패널 표시
-            if (_isSequencePlaying && _currentSequenceIndex == 0 && UIManager.Instance != null)
+            // 첫 번째 시퀀스 크로스페이드에서만 결과 패널 표시 (바로가기 모드에서는 UI 전환 생략)
+            if (_isSequencePlaying && _currentSequenceIndex == 0 && !_isShortcutMode && UIManager.Instance != null)
             {
                 UIManager.Instance.ShowResultPanel();
             }
@@ -658,15 +685,25 @@ public class VideoManager : MonoBehaviour
                 else
                     Debug.LogError("[VideoManager] 대기 영상 경로를 찾을 수 없어 복귀 실패!");
 
-                OnSequenceCompleted?.Invoke();
-
-                // UI만 대기 화면으로 전환 (VideoManager를 다시 호출하지 않는 안전한 메서드)
-                if (UIManager.Instance != null)
+                if (_isShortcutMode)
                 {
-                    if (QuizManager.Instance != null)
-                        QuizManager.Instance.ResetQuiz();
+                    // 바로가기 모드: UI 전환 없이 이벤트만 발행 (패널 유지)
+                    OnShortcutSequenceCompleted?.Invoke();
+                    Debug.Log("[VideoManager] 바로가기 시퀀스 완료 → 이벤트 발행 (UI 유지).");
+                }
+                else
+                {
+                    // 일반 퀴즈 모드: 기존 동작 유지
+                    OnSequenceCompleted?.Invoke();
 
-                    UIManager.Instance.ShowStandbyPanelOnly();
+                    // UI만 대기 화면으로 전환 (VideoManager를 다시 호출하지 않는 안전한 메서드)
+                    if (UIManager.Instance != null)
+                    {
+                        if (QuizManager.Instance != null)
+                            QuizManager.Instance.ResetQuiz();
+
+                        UIManager.Instance.ShowStandbyPanelOnly();
+                    }
                 }
             }
         }
